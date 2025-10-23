@@ -1,0 +1,22 @@
+.App {
+  font-family: 'Poppins';
+  src: url('https://fonts.googleapis.com/css?family=Poppins'),
+}
+
+.App-background {
+  background-color: #282c34;
+  min-height: 200vh;
+  /* display: flex; */
+  /* flex-direction: column;
+  align-items: center;
+  justify-content: top; */
+  /* font-size: calc(10px + 2vmin); */
+  color: white;
+}
+
+a {
+  color: inherit;
+  /* Inherits the color of the parent */
+  text-decoration: none;
+  /* Removes the underline */
+}

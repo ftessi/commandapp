@@ -1,0 +1,565 @@
+'use client';
+
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { Product, ProductContextType, Order, OrderStatus } from '../types/types';
+import ProductsTestData from '../assets/Products.json';
+import { v4 as uuidv4 } from 'uuid';
+import { getStoredSessionToken } from '../services/sessionService';
+
+const ProductContext = createContext<ProductContextType | undefined>(undefined);
+
+interface ProductProviderProps {
+    children: ReactNode;
+}
+
+export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) => {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [cartTotal, setCartTotal] = useState<number>(0);
+    const [currentView, setCurrentView] = useState<'landing' | 'menu' | 'resume' | 'orderHistory' | 'tickets' | 'info'>('landing');
+    const [currentOrders, setCurrentOrders] = useState<Order[]>([]);
+    const [pastOrders, setPastOrders] = useState<Order[]>([]);
+    const [isListening, setIsListening] = useState<boolean>(false);
+
+    // Use ref to track current orders for polling without causing re-renders
+    const currentOrdersRef = React.useRef<Order[]>([]);
+
+    // Keep ref in sync with state
+    React.useEffect(() => {
+        currentOrdersRef.current = currentOrders;
+    }, [currentOrders]);
+
+    // Load persisted state from local storage on component mount
+    useEffect(() => {
+        console.log('📦 [ProductsDataContext] Loading persisted cart quantities from localStorage...');
+
+        const storedCart = localStorage.getItem('commandapp_cart');
+        const storedCurrentOrders = localStorage.getItem('commandapp_current_orders');
+        const storedPastOrders = localStorage.getItem('commandapp_past_orders');
+
+        // Don't load products from localStorage here - let API fetch handle that
+        // We only restore cart quantities later when merging with API data
+        if (storedCart) {
+            console.log('🛒 [ProductsDataContext] Found stored cart (will merge with API products later)');
+        } else {
+            console.log('🛒 [ProductsDataContext] No stored cart found');
+        }
+
+        if (storedCurrentOrders) {
+            try {
+                const parsed = JSON.parse(storedCurrentOrders);
+                console.log('📋 [ProductsDataContext] Found stored current orders:', parsed.length, 'orders');
+                setCurrentOrders(parsed);
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error parsing current orders:', error);
+            }
+        } else {
+            console.log('📋 [ProductsDataContext] No stored current orders found');
+        }
+
+        if (storedPastOrders) {
+            try {
+                const parsed = JSON.parse(storedPastOrders);
+                console.log('📜 [ProductsDataContext] Found stored past orders:', parsed.length, 'orders');
+                setPastOrders(parsed);
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error parsing past orders:', error);
+            }
+        } else {
+            console.log('📜 [ProductsDataContext] No stored past orders found');
+        }
+    }, []);
+
+    // Load products from API or test data
+    useEffect(() => {
+        console.log('🌐 [ProductsDataContext] Fetching products from API...');
+
+        // Fetch products from the backend
+        const fetchProducts = async () => {
+            try {
+                const response = await fetch('/api/products');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch products from API');
+                }
+                const data = await response.json();
+                console.log('✅ [ProductsDataContext] API response received:', data);
+
+                // API returns grouped by category: { "Primi": [...], "Secondi": [...] }
+                // Flatten to array of products while preserving category
+                const flatProducts: Product[] = Object.entries(data)
+                    .flatMap(([category, products]: [string, any]) =>
+                        products.map((product: any) => ({
+                            ...product,
+                            category, // Preserve category name
+                            quantityInCart: 0
+                        }))
+                    );
+
+                console.log('✅ [ProductsDataContext] Flattened products from API:', flatProducts.length, 'products');
+                console.log('✅ [ProductsDataContext] First product from API:', flatProducts[0]?.name, 'in category:', (flatProducts[0] as any)?.category);
+
+                // Preserve cart quantities from localStorage
+                const storedCart = localStorage.getItem('commandapp_cart');
+                if (storedCart) {
+                    try {
+                        const parsedCart = JSON.parse(storedCart);
+                        console.log('🔄 [ProductsDataContext] Merging API products with stored cart quantities...');
+                        const merged = flatProducts.map(product => {
+                            // Find stored product by ID
+                            const storedProduct = parsedCart.find((p: Product) => p.id === product.id);
+                            if (storedProduct && storedProduct.quantityInCart > 0) {
+                                console.log(`  - Product ${product.name}: restored quantity ${storedProduct.quantityInCart}`);
+                                // IMPORTANT: Use API product data, only restore the quantity
+                                return { ...product, quantityInCart: storedProduct.quantityInCart };
+                            }
+                            return product;
+                        });
+                        setProducts(merged);
+                        console.log('✅ [ProductsDataContext] Set products with merged cart quantities');
+                        console.log('✅ [ProductsDataContext] Products in state:', merged.map(p => ({ id: p.id, name: p.name, qty: p.quantityInCart })));
+                    } catch (error) {
+                        console.error('❌ [ProductsDataContext] Error merging cart:', error);
+                        setProducts(flatProducts);
+                    }
+                } else {
+                    setProducts(flatProducts);
+                    console.log('✅ [ProductsDataContext] Set products from API (no cart to merge)');
+                }
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error fetching products from API:', error);
+                // Use test data as fallback
+                const flatProducts: Product[] = Object.values(ProductsTestData)
+                    .flat()
+                    .map(product => ({ ...product, quantityInCart: 0 }));
+
+                console.log('⚠️  [ProductsDataContext] Falling back to local ProductsTestData:', flatProducts.length, 'products');
+                console.log('⚠️  [ProductsDataContext] First product from fallback:', flatProducts[0]?.name);
+
+                setProducts(prevProducts => {
+                    if (prevProducts.length > 0) {
+                        console.log('⚠️  [ProductsDataContext] Products already loaded, skipping fallback');
+                        return prevProducts;
+                    }
+                    return flatProducts;
+                });
+            }
+        };
+
+        fetchProducts();
+    }, []);
+
+    // Update cart total whenever products change
+    useEffect(() => {
+        const total = products.reduce((sum, product) =>
+            sum + (product.price * product.quantityInCart), 0);
+
+        const itemsInCart = products.filter(p => p.quantityInCart > 0).length;
+        if (itemsInCart > 0) {
+            console.log(`💰 [ProductsDataContext] Cart updated: ${itemsInCart} items, total: $${total.toFixed(2)}`);
+        }
+
+        setCartTotal(total);
+
+        // Persist cart to local storage
+        if (products.length > 0) {
+            localStorage.setItem('commandapp_cart', JSON.stringify(products));
+            if (itemsInCart > 0) {
+                console.log('💾 [ProductsDataContext] Cart saved to localStorage');
+            }
+        }
+    }, [products]);
+
+    // Fetch orders from API on mount (after localStorage load)
+    useEffect(() => {
+        console.log('🌐 [ProductsDataContext] Fetching orders from API...');
+
+        const fetchOrders = async () => {
+            try {
+                // Get session token to fetch user-specific orders
+                const sessionToken = getStoredSessionToken();
+                let url = '/api/orders';
+                
+                if (sessionToken) {
+                    url += `?sessionToken=${sessionToken}`;
+                    console.log('🔐 [ProductsDataContext] Fetching orders for session');
+                } else {
+                    console.log('ℹ️ [ProductsDataContext] No session token, fetching all orders (dev mode)');
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch orders from API');
+                }
+                const data = await response.json();
+                console.log('✅ [ProductsDataContext] Orders API response:', data.orders?.length || 0, 'orders');
+
+                if (data.orders && Array.isArray(data.orders)) {
+                    // Transform API orders to match our Order type
+                    const apiOrders: Order[] = data.orders.map((order: any) => ({
+                        orderId: order.order_id,
+                        ticketNumber: order.ticket_number || 'N/A',
+                        items: order.order_items?.map((item: any) => ({
+                            productId: item.product_id,
+                            name: item.name,
+                            price: Number(item.price),
+                            quantity: item.quantity
+                        })) || [],
+                        timestamp: order.created_at,
+                        total: Number(order.total),
+                        status: order.status
+                    }));
+
+                    // Separate current and past orders
+                    const current = apiOrders.filter(o =>
+                        o.status === OrderStatus.PENDING ||
+                        o.status === OrderStatus.PAID ||
+                        o.status === OrderStatus.PREPARING
+                    );
+                    const past = apiOrders.filter(o =>
+                        o.status === OrderStatus.COMPLETED
+                    );
+
+                    console.log('✅ [ProductsDataContext] Current orders from API:', current.length);
+                    console.log('✅ [ProductsDataContext] Past orders from API:', past.length);
+
+                    // Merge with localStorage orders (API takes precedence)
+                    setCurrentOrders(prevOrders => {
+                        // Keep local orders that aren't in API response
+                        const localOnly = prevOrders.filter(local =>
+                            !current.some(api => api.orderId === local.orderId)
+                        );
+                        const merged = [...current, ...localOnly];
+                        console.log('🔄 [ProductsDataContext] Merged current orders:', merged.length);
+                        return merged;
+                    });
+
+                    setPastOrders(prevOrders => {
+                        const localOnly = prevOrders.filter(local =>
+                            !past.some(api => api.orderId === local.orderId)
+                        );
+                        const merged = [...past, ...localOnly];
+                        console.log('🔄 [ProductsDataContext] Merged past orders:', merged.length);
+                        return merged;
+                    });
+                }
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error fetching orders from API:', error);
+                console.log('⚠️  [ProductsDataContext] Using localStorage orders only');
+            }
+        };
+
+        // Delay order fetch slightly so localStorage loads first
+        const timer = setTimeout(fetchOrders, 500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Listen to server for order updates (admin polling)
+    useEffect(() => {
+        // Start polling only if we have orders and aren't already listening
+        if (currentOrders.length > 0 && !isListening) {
+            setIsListening(true);
+            console.log(`🔄 [ProductsDataContext] Starting order polling for ${currentOrders.length} active orders...`);
+        }
+
+        // Stop polling if no more orders
+        if (currentOrders.length === 0 && isListening) {
+            setIsListening(false);
+            console.log('🛑 [ProductsDataContext] No active orders, stopping polling');
+        }
+    }, [currentOrders.length]); // Only depend on the LENGTH, not the array itself
+
+    // Separate effect for the actual polling interval
+    useEffect(() => {
+        if (!isListening) return;
+
+        console.log('🎯 [ProductsDataContext] Polling interval started');
+
+        // Poll for order status updates
+        const checkOrderStatus = async () => {
+            const orders = currentOrdersRef.current;
+            if (orders.length === 0) return;
+
+            console.log(`🔍 [ProductsDataContext] Polling for order status updates... (${orders.length} orders)`);
+
+            try {
+                const response = await fetch('/api/orders');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch orders');
+                }
+
+                const data = await response.json();
+                if (data.orders && Array.isArray(data.orders)) {
+                    console.log(`✅ [ProductsDataContext] Polled ${data.orders.length} orders from server`);
+
+                    // Check for status changes
+                    let changesDetected = false;
+                    orders.forEach(localOrder => {
+                        const serverOrder = data.orders.find((o: any) => o.order_id === localOrder.orderId);
+                        if (serverOrder && serverOrder.status !== localOrder.status) {
+                            console.log(`🔔 [ProductsDataContext] Order ${localOrder.orderId} status changed: ${localOrder.status} → ${serverOrder.status}`);
+                            updateOrderStatus(localOrder.orderId, serverOrder.status);
+                            changesDetected = true;
+                        }
+                    });
+
+                    if (!changesDetected) {
+                        console.log('ℹ️  [ProductsDataContext] No status changes detected');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error polling orders:', error);
+            }
+        };
+
+        // Check immediately on start
+        checkOrderStatus();
+
+        // Then check every 30 seconds
+        const intervalId = setInterval(checkOrderStatus, 30000);
+
+        return () => {
+            console.log('🛑 [ProductsDataContext] Polling interval stopped');
+            clearInterval(intervalId);
+        };
+    }, [isListening]); // Only re-run if isListening changes
+
+    // Persist current orders and past orders when they change
+    useEffect(() => {
+        if (currentOrders.length > 0) {
+            localStorage.setItem('commandapp_current_orders', JSON.stringify(currentOrders));
+        } else {
+            localStorage.removeItem('commandapp_current_orders');
+        }
+    }, [currentOrders]);
+
+    useEffect(() => {
+        if (pastOrders.length > 0) {
+            localStorage.setItem('commandapp_past_orders', JSON.stringify(pastOrders));
+        }
+    }, [pastOrders]);
+
+    const addToCart = (productId: number, quantity: number) => {
+        console.log(`➕ [ProductsDataContext] Adding to cart: Product #${productId}, quantity: ${quantity}`);
+        setProducts((prevProducts) =>
+            prevProducts.map((product) =>
+                product.id === productId
+                    ? { ...product, quantityInCart: product.quantityInCart + quantity }
+                    : product
+            )
+        );
+    };
+
+    const removeFromCart = (productId: number) => {
+        console.log(`❌ [ProductsDataContext] Removing from cart: Product #${productId}`);
+        setProducts((prevProducts) =>
+            prevProducts.map((product) =>
+                product.id === productId ? { ...product, quantityInCart: 0 } : product
+            )
+        );
+    };
+
+    const updateCartQuantity = (productId: number, quantity: number) => {
+        console.log(`🔄 [ProductsDataContext] Updating cart quantity: Product #${productId}, new quantity: ${quantity}`);
+        setProducts((prevProducts) =>
+            prevProducts.map((product) =>
+                product.id === productId
+                    ? { ...product, quantityInCart: quantity }
+                    : product
+            )
+        );
+    };
+
+    const clearCart = () => {
+        console.log('🗑️  [ProductsDataContext] Clearing cart');
+        setProducts((prevProducts) =>
+            prevProducts.map((product) => ({ ...product, quantityInCart: 0 }))
+        );
+        // Clear cart in localStorage
+        localStorage.removeItem('commandapp_cart');
+    };
+
+    const getProductById = (id: number) => {
+        return products.find(product => product.id === id);
+    };
+
+    const getCartItems = () => {
+        return products.filter(product => product.quantityInCart > 0);
+    };
+
+    const placeOrder = async () => {
+        const cartItems = getCartItems();
+
+        if (cartItems.length === 0) {
+            console.log('⚠️  [ProductsDataContext] Cannot place order: cart is empty');
+            return null;
+        }
+
+        const timestamp = new Date().toISOString();
+        
+        // Get session token
+        const sessionToken = getStoredSessionToken();
+
+        // Prepare payload for backend
+        const payload: any = {
+            total: cartTotal,
+            items: cartItems.map(item => ({
+                productId: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantityInCart
+            }))
+        };
+
+        // Include session token if available
+        if (sessionToken) {
+            payload.sessionToken = sessionToken;
+            console.log('🔐 [ProductsDataContext] Including session token in order');
+        }
+
+        console.log('📤 [ProductsDataContext] Placing order:', payload);
+
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                throw new Error('API error when placing order');
+            }
+
+            const body = await res.json();
+            const backendOrder = body.order;
+
+            console.log('✅ [ProductsDataContext] Order placed successfully:', backendOrder.order_id, 'Ticket:', backendOrder.ticket_number);
+
+            const newOrder: Order = {
+                orderId: backendOrder.order_id,
+                ticketNumber: backendOrder.ticket_number,
+                items: payload.items,
+                timestamp: backendOrder.created_at || timestamp,
+                total: payload.total,
+                status: backendOrder.status || OrderStatus.PENDING
+            };
+
+            setCurrentOrders(prev => {
+                const updated = [...prev, newOrder];
+                console.log('📋 [ProductsDataContext] Added order to current orders. Total current orders:', updated.length);
+                return updated;
+            });
+            clearCart();
+            return newOrder;
+        } catch (error) {
+            console.error('❌ [ProductsDataContext] Error placing order to API, falling back to local order:', error);
+            // Fallback to local behavior
+            const newOrderId = uuidv4();
+            const newOrder: Order = {
+                orderId: newOrderId,
+                ticketNumber: 'LOCAL-' + Math.random().toString().slice(2, 5),
+                items: cartItems.map(item => ({
+                    productId: item.id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantityInCart
+                })),
+                timestamp,
+                total: cartTotal,
+                status: OrderStatus.PENDING,
+            };
+
+            console.log('⚠️  [ProductsDataContext] Created local order:', newOrderId);
+            setCurrentOrders(prev => [...prev, newOrder]);
+            clearCart();
+            return newOrder;
+        }
+    };
+
+    const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+        console.log(`🔄 [ProductsDataContext] Updating order ${orderId} status to: ${status}`);
+
+        setCurrentOrders(prev => {
+            return prev.map(order => {
+                if (order.orderId === orderId) {
+                    return { ...order, status };
+                }
+                return order;
+            });
+        });
+
+        // If the order is complete, move it to past orders
+        if (status === OrderStatus.COMPLETED) {
+            const orderToMove = currentOrders.find(order => order.orderId === orderId);
+            if (orderToMove) {
+                const updatedOrder = { ...orderToMove, status };
+                console.log(`📜 [ProductsDataContext] Moving order ${orderId} to past orders`);
+                setPastOrders(prev => [...prev, updatedOrder]);
+                setCurrentOrders(prev => prev.filter(order => order.orderId !== orderId));
+            }
+        }
+    };
+
+    const navigateToLanding = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Landing');
+        setCurrentView('landing');
+    };
+
+    const navigateToResume = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Resume');
+        setCurrentView('resume');
+    };
+
+    const navigateToMenu = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Menu');
+        setCurrentView('menu');
+    };
+
+    const navigateToOrderHistory = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Order History');
+        setCurrentView('orderHistory');
+    };
+
+    const navigateToTickets = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Tickets');
+        setCurrentView('tickets');
+    };
+
+    const navigateToInfo = () => {
+        console.log('🧭 [ProductsDataContext] Navigating to Info');
+        setCurrentView('info');
+    };
+
+    return (
+        <ProductContext.Provider value={{
+            products,
+            addToCart,
+            removeFromCart,
+            clearCart,
+            updateCartQuantity,
+            getProductById,
+            getCartItems,
+            cartTotal,
+            currentView,
+            navigateToLanding,
+            navigateToResume,
+            navigateToMenu,
+            navigateToOrderHistory,
+            navigateToTickets,
+            navigateToInfo,
+            currentOrders,
+            pastOrders,
+            placeOrder,
+            updateOrderStatus,
+            isListening
+        }}>
+            {children}
+        </ProductContext.Provider>
+    );
+};
+
+export const useProducts = () => {
+    const context = useContext(ProductContext);
+    if (!context) {
+        throw new Error('useProducts must be used within a ProductProvider');
+    }
+    return context;
+};

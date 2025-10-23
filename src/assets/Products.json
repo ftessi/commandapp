@@ -1,0 +1,178 @@
+{
+    "Primi": [
+        {
+            "id": 1,
+            "name": "Cheeseburger",
+            "price": 5.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Juicy beef patty with melted cheese, lettuce, tomato, and a soft sesame seed bun."
+        },
+        {
+            "id": 2,
+            "name": "Margherita Pizza",
+            "price": 8.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Classic Italian pizza topped with fresh mozzarella, basil, and tomato sauce."
+        },
+        {
+            "id": 3,
+            "name": "Caesar Salad",
+            "price": 6.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Crisp romaine lettuce, Parmesan cheese, croutons, and Caesar dressing."
+        },
+        {
+            "id": 4,
+            "name": "Chocolate Cake",
+            "price": 4.50,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Rich and moist chocolate cake topped with creamy chocolate frosting."
+        },
+        {
+            "id": 5,
+            "name": "Grilled Salmon",
+            "price": 14.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Freshly grilled salmon filet served with a side of lemon and vegetables."
+        },
+        {
+            "id": 6,
+            "name": "Pasta Alfredo",
+            "price": 10.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Creamy Alfredo sauce served over fettuccine pasta with Parmesan cheese."
+        }
+    ],
+    "Secondi": [
+        {
+            "id": 7,
+            "name": "Cheeseburger2",
+            "price": 5.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Juicy beef patty with melted cheese, lettuce, tomato, and a soft sesame seed bun."
+        },
+        {
+            "id": 8,
+            "name": "Margherita Pizza2",
+            "price": 8.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Classic Italian pizza topped with fresh mozzarella, basil, and tomato sauce."
+        },
+        {
+            "id": 9,
+            "name": "Caesar Salad2",
+            "price": 6.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Crisp romaine lettuce, Parmesan cheese, croutons, and Caesar dressing."
+        },
+        {
+            "id": 10,
+            "name": "Chocolate Cake2",
+            "price": 4.50,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Rich and moist chocolate cake topped with creamy chocolate frosting."
+        },
+        {
+            "id": 11,
+            "name": "Grilled Salmon2",
+            "price": 14.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Freshly grilled salmon filet served with a side of lemon and vegetables."
+        },
+        {
+            "id": 12,
+            "name": "Pasta Alfredo2",
+            "price": 10.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Creamy Alfredo sauce served over fettuccine pasta with Parmesan cheese."
+        }
+    ],
+    "Antipasti": [
+        {
+            "id": 13,
+            "name": "Cheeseburger3",
+            "price": 5.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Juicy beef patty with melted cheese, lettuce, tomato, and a soft sesame seed bun."
+        },
+        {
+            "id": 14,
+            "name": "Margherita Pizza3",
+            "price": 8.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Classic Italian pizza topped with fresh mozzarella, basil, and tomato sauce."
+        },
+        {
+            "id": 15,
+            "name": "Caesar Salad3",
+            "price": 6.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Crisp romaine lettuce, Parmesan cheese, croutons, and Caesar dressing."
+        },
+        {
+            "id": 16,
+            "name": "Chocolate Cake3",
+            "price": 4.50,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Rich and moist chocolate cake topped with creamy chocolate frosting."
+        },
+        {
+            "id": 17,
+            "name": "Grilled Salmon3",
+            "price": 14.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Freshly grilled salmon filet served with a side of lemon and vegetables."
+        },
+        {
+            "id": 18,
+            "name": "Pasta Alfredo3",
+            "price": 10.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Creamy Alfredo sauce served over fettuccine pasta with Parmesan cheese."
+        }
+    ],
+    "Dolci": [
+        {
+            "id": 19,
+            "name": "Cheeseburger4",
+            "price": 5.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Juicy beef pussy."
+        },
+        {
+            "id": 20,
+            "name": "Margherita Pizza4",
+            "price": 8.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Classic Italian pizza topped with fresh mozzarella, basil, and tomato sauce."
+        },
+        {
+            "id": 21,
+            "name": "Caesar Salad4",
+            "price": 6.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Crisp romaine lettuce, Parmesan cheese, croutons, and Caesar dressing."
+        },
+        {
+            "id": 22,
+            "name": "Chocolate Cake4",
+            "price": 4.50,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Rich and moist chocolate cake topped with creamy chocolate frosting."
+        },
+        {
+            "id": 23,
+            "name": "Grilled Salmon4",
+            "price": 14.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Freshly grilled salmon filet served with a side of lemon and vegetables."
+        },
+        {
+            "id": 24,
+            "name": "Pasta Alfredo4",
+            "price": 10.99,
+            "image": "/assets/images/pasta.jpg",
+            "details": "Creamy Alfredo sauce served over fettuccine pasta with Parmesan cheese."
+        }
+    ]
+}
