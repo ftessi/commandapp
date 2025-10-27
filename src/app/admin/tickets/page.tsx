@@ -254,7 +254,7 @@ export default function TicketsAdminPage() {
     };
 
     const handleMarkAsPaid = async (ticketId: string) => {
-        if (!confirm('Mark this ticket as paid? This will generate a QR code and send an email to the user.')) return;
+        if (!confirm('Mark this ticket as paid? The user can check their ticket status in the app.')) return;
 
         setUpdating(ticketId);
 
@@ -268,7 +268,7 @@ export default function TicketsAdminPage() {
             const data = await res.json();
 
             if (res.ok) {
-                alert('✅ Ticket marked as paid! QR code generated and email sent.');
+                alert('✅ Ticket marked as paid! User can now access the event.');
                 fetchTickets();
             } else {
                 alert(`❌ ${data.error || 'Failed to update ticket'}`);

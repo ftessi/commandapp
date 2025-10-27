@@ -79,6 +79,42 @@ export default function TicketsPage() {
         };
     }, []);
 
+    // Realtime subscription for user's tickets
+    useEffect(() => {
+        const sessionToken = getStoredSessionToken();
+        if (!sessionToken) return;
+
+        console.log('🔴 [TicketsPage] Setting up realtime subscription for user tickets');
+
+        const ticketsChannel = supabase
+            .channel('user-tickets-changes')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'tickets'
+            }, (payload) => {
+                console.log('🔔 [TicketsPage] Ticket update detected:', payload.eventType, payload.new);
+                // Reload user's ticket whenever any ticket changes
+                // (we fetch by session token, so only user's ticket will be returned)
+                loadMyTicket(sessionToken);
+            })
+            .subscribe((status) => {
+                console.log('🔴 [TicketsPage] Tickets subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [TicketsPage] Successfully subscribed to tickets updates');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [TicketsPage] Tickets subscription error');
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⏱️ [TicketsPage] Tickets subscription timed out');
+                }
+            });
+        
+        return () => {
+            console.log('🛑 [TicketsPage] Cleaning up tickets subscription');
+            supabase.removeChannel(ticketsChannel);
+        };
+    }, [hasSession]);
+
     const loadMyTicket = async (sessionToken: string) => {
         try {
             // Add timestamp to prevent caching

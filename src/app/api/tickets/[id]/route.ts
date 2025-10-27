@@ -128,40 +128,9 @@ export async function PATCH(
 
         console.log('✅ Ticket updated successfully:', data);
 
-        // If marked as paid, send email with QR code (QR uses session_token)
-        if (status === 'paid' && data.sessions) {
-            console.log('📧 Ticket marked as paid, generating QR and sending email...');
-
-            try {
-                const sessionToken = data.sessions.session_token;
-
-                // Generate QR code
-                const qrCodeDataUrl = await generateSessionQR(sessionToken);
-                console.log('✅ QR code generated');
-
-                // Send email
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-                const emailSent = await sendTicketEmail({
-                    to: data.sessions.email,
-                    firstName: data.sessions.first_name,
-                    lastName: data.sessions.last_name,
-                    ticketType: data.ticket_type_name,
-                    price: data.price,
-                    qrCodeDataUrl,
-                    sessionToken,
-                    appUrl
-                });
-
-                if (emailSent) {
-                    console.log('✅ Email sent successfully');
-                } else {
-                    console.warn('⚠️ Email not sent (API key may not be configured)');
-                }
-            } catch (emailError) {
-                console.error('❌ Error generating QR or sending email:', emailError);
-                // Don't fail the request, just log the error
-            }
-        }
+        // Email was already sent when ticket was created/reserved
+        // No need to send again when marked as paid
+        // User can check ticket status in the app via their session
 
         return NextResponse.json({ ticket: data }, { status: 200 });
 
