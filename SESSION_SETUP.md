@@ -110,12 +110,12 @@ BUT cannot be used for entry again
 
 ## Verification Checklist
 
-- [ ] Database migration completed
-- [ ] Can purchase ticket
-- [ ] Session token appears in localStorage
-- [ ] Can place order
-- [ ] Order appears in history
-- [ ] Can clear localStorage and recover via `/session/{token}`
+- [ x ] Database migration completed
+- [ x ] Can purchase ticket
+- [ x ] Session token appears in localStorage
+- [ x ] Can place order
+- [ x ] Order appears in history
+- [ x ] Can clear localStorage and recover via `/session/{token}`
 - [ ] Admin can see all tickets
 - [ ] Admin can mark ticket as paid
 - [ ] Admin can redeem ticket for entry

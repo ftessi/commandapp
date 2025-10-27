@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     console.log('🔐 POST /api/sessions - Creating/retrieving session');
     try {
         const body = await request.json();
-        const { firstName, lastName, email, existingToken } = body;
+        const { firstName, lastName, email, existingToken, anonymous } = body;
 
         if (!supabase) {
             console.error('❌ Supabase not configured');
@@ -55,9 +55,34 @@ export async function POST(request: NextRequest) {
             console.log('⚠️ Invalid token, will create new session');
         }
 
-        // Validate required fields for new session
+        // Create anonymous session (no user info required)
+        if (anonymous) {
+            console.log('➕ Creating anonymous session');
+            const { data: newSession, error: createError } = await supabase
+                .from('sessions')
+                .insert([{
+                    first_name: 'Anonymous',
+                    last_name: 'User',
+                    email: `anon_${Date.now()}@temp.local`
+                }])
+                .select('*')
+                .single();
+
+            if (createError) {
+                console.error('❌ Error creating anonymous session:', createError);
+                return NextResponse.json(
+                    { error: createError.message || 'Failed to create session' },
+                    { status: 500 }
+                );
+            }
+
+            console.log('✅ Anonymous session created:', newSession.id, 'Token:', newSession.session_token);
+            return NextResponse.json({ session: newSession, existing: false, anonymous: true }, { status: 201 });
+        }
+
+        // Validate required fields for named session
         if (!firstName || !lastName || !email) {
-            console.error('❌ Missing required fields');
+            console.error('❌ Missing required fields for named session');
             return NextResponse.json(
                 { error: 'Missing required fields: firstName, lastName, email' },
                 { status: 400 }
@@ -170,6 +195,69 @@ export async function GET(request: NextRequest) {
 
     } catch (err: any) {
         console.error('❌ Unexpected error in GET /api/sessions:', err);
+        return NextResponse.json(
+            { error: err.message || 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
+
+// PATCH - Update session with user info
+export async function PATCH(request: NextRequest) {
+    console.log('🔄 PATCH /api/sessions - Updating session');
+    try {
+        const body = await request.json();
+        const { sessionToken, firstName, lastName, email } = body;
+
+        if (!sessionToken) {
+            return NextResponse.json(
+                { error: 'Session token is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!firstName || !lastName || !email) {
+            return NextResponse.json(
+                { error: 'Missing required fields: firstName, lastName, email' },
+                { status: 400 }
+            );
+        }
+
+        if (!supabase) {
+            console.error('❌ Supabase not configured');
+            return NextResponse.json(
+                { error: 'Database not configured' },
+                { status: 500 }
+            );
+        }
+
+        console.log('🔍 Updating session:', sessionToken);
+        
+        const { data: updatedSession, error } = await supabase
+            .from('sessions')
+            .update({
+                first_name: firstName,
+                last_name: lastName,
+                email: email.toLowerCase(),
+                last_accessed_at: new Date().toISOString()
+            })
+            .eq('session_token', sessionToken)
+            .select('*')
+            .single();
+
+        if (error || !updatedSession) {
+            console.error('❌ Error updating session:', error);
+            return NextResponse.json(
+                { error: 'Session not found or update failed' },
+                { status: 404 }
+            );
+        }
+
+        console.log('✅ Session updated:', updatedSession.id);
+        return NextResponse.json({ session: updatedSession }, { status: 200 });
+
+    } catch (err: any) {
+        console.error('❌ Unexpected error in PATCH /api/sessions:', err);
         return NextResponse.json(
             { error: err.message || 'Internal server error' },
             { status: 500 }

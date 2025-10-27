@@ -90,4 +90,5 @@ export interface ProductContextType {
     placeOrder: () => Promise<Order | null>;
     updateOrderStatus: (orderId: string, status: OrderStatus) => void;
     isListening: boolean;
+    isServiceOpen: boolean;
 }

@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { generateSessionQR } from '@/services/qrService';
+import { sendTicketEmail } from '@/services/emailService';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -128,6 +130,31 @@ export async function POST(request: NextRequest) {
             .select('session_token')
             .eq('id', sessionId)
             .single();
+
+        // Generate QR code and send email immediately
+        if (session?.session_token) {
+            try {
+                console.log('📧 Generating QR and sending email...');
+                const qrDataUrl = await generateSessionQR(session.session_token);
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yourapp.com';
+                
+                await sendTicketEmail({
+                    to: email.toLowerCase(),
+                    firstName,
+                    lastName,
+                    ticketType: ticketType.name,
+                    price: ticketType.price,
+                    qrCodeDataUrl: qrDataUrl,
+                    sessionToken: session.session_token,
+                    appUrl
+                });
+                
+                console.log('✅ Email sent to:', email);
+            } catch (emailError) {
+                console.error('⚠️ Failed to send email:', emailError);
+                // Don't fail the ticket creation if email fails
+            }
+        }
 
         return NextResponse.json({ 
             ticket, 

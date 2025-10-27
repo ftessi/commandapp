@@ -38,7 +38,6 @@ ADD COLUMN IF NOT EXISTS entry_redeemed_by VARCHAR(100);
 
 -- Grant access to anon users
 GRANT SELECT, INSERT, UPDATE ON sessions TO anon;
-GRANT USAGE, SELECT ON SEQUENCE sessions_id_seq TO anon;
 
 -- Function to update last_accessed_at on session access
 CREATE OR REPLACE FUNCTION update_session_last_accessed()

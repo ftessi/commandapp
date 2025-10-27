@@ -19,6 +19,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
     const [currentOrders, setCurrentOrders] = useState<Order[]>([]);
     const [pastOrders, setPastOrders] = useState<Order[]>([]);
     const [isListening, setIsListening] = useState<boolean>(false);
+    const [isServiceOpen, setIsServiceOpen] = useState<boolean>(true);
 
     // Use ref to track current orders for polling without causing re-renders
     const currentOrdersRef = React.useRef<Order[]>([]);
@@ -27,6 +28,33 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
     React.useEffect(() => {
         currentOrdersRef.current = currentOrders;
     }, [currentOrders]);
+
+    // No device session initialization - users get session from ticket purchase only
+    // Session token will be stored when they click QR link from email
+
+    // Fetch service status (open/closed)
+    useEffect(() => {
+        const fetchServiceStatus = async () => {
+            try {
+                const response = await fetch('/api/service-status?service=ordering');
+                if (response.ok) {
+                    const data = await response.json();
+                    setIsServiceOpen(data.is_open);
+                    console.log('🏪 [ProductsDataContext] Service status:', data.is_open ? 'OPEN' : 'CLOSED');
+                }
+            } catch (error) {
+                console.error('❌ [ProductsDataContext] Error fetching service status:', error);
+                // Default to open on error
+                setIsServiceOpen(true);
+            }
+        };
+
+        fetchServiceStatus();
+        
+        // Poll service status every 30 seconds
+        const interval = setInterval(fetchServiceStatus, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Load persisted state from local storage on component mount
     useEffect(() => {
@@ -549,7 +577,8 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
             pastOrders,
             placeOrder,
             updateOrderStatus,
-            isListening
+            isListening,
+            isServiceOpen
         }}>
             {children}
         </ProductContext.Provider>

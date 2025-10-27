@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { generateSessionQR } from '@/services/qrService';
+import { sendTicketEmail } from '@/services/emailService';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -104,7 +106,15 @@ export async function PATCH(
             .from('tickets')
             .update(updateData)
             .eq('id', id)
-            .select('*')
+            .select(`
+                *,
+                sessions (
+                    session_token,
+                    first_name,
+                    last_name,
+                    email
+                )
+            `)
             .single();
 
         if (error) {
@@ -118,9 +128,39 @@ export async function PATCH(
 
         console.log('✅ Ticket updated successfully:', data);
 
-        // If marked as paid, the trigger should have generated qr_code
-        if (status === 'paid' && data.qr_code) {
-            console.log('✅ QR Code generated:', data.qr_code);
+        // If marked as paid, generate QR and send email
+        if (status === 'paid' && data.qr_code && data.sessions) {
+            console.log('📧 Ticket marked as paid, generating QR and sending email...');
+            
+            try {
+                const sessionToken = data.sessions.session_token;
+                
+                // Generate QR code
+                const qrCodeDataUrl = await generateSessionQR(sessionToken);
+                console.log('✅ QR code generated');
+                
+                // Send email
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                const emailSent = await sendTicketEmail({
+                    to: data.sessions.email,
+                    firstName: data.sessions.first_name,
+                    lastName: data.sessions.last_name,
+                    ticketType: data.ticket_type_name,
+                    price: data.price,
+                    qrCodeDataUrl,
+                    sessionToken,
+                    appUrl
+                });
+                
+                if (emailSent) {
+                    console.log('✅ Email sent successfully');
+                } else {
+                    console.warn('⚠️ Email not sent (API key may not be configured)');
+                }
+            } catch (emailError) {
+                console.error('❌ Error generating QR or sending email:', emailError);
+                // Don't fail the request, just log the error
+            }
         }
 
         return NextResponse.json({ ticket: data }, { status: 200 });

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface Ticket {
     id: string;
@@ -29,7 +30,10 @@ export default function TicketsAdminPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [redeeming, setRedeeming] = useState<string | null>(null);
+    const [updating, setUpdating] = useState<string | null>(null);
     const [qrInput, setQrInput] = useState('');
+    const [showScanner, setShowScanner] = useState(false);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -46,6 +50,15 @@ export default function TicketsAdminPage() {
     useEffect(() => {
         filterTickets();
     }, [tickets, searchTerm, statusFilter]);
+
+    useEffect(() => {
+        // Cleanup scanner on unmount
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.stop().catch(console.error);
+            }
+        };
+    }, []);
 
     const fetchTickets = async () => {
         console.log('📋 Fetching tickets...');
@@ -92,6 +105,81 @@ export default function TicketsAdminPage() {
         }
 
         setFilteredTickets(filtered);
+    };
+
+    const startScanner = async () => {
+        try {
+            const html5QrCode = new Html5Qrcode("qr-reader");
+            scannerRef.current = html5QrCode;
+
+            await html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                (decodedText) => {
+                    console.log('QR Code scanned:', decodedText);
+                    // Extract session token from URL
+                    const match = decodedText.match(/\/qr\/([a-f0-9-]+)/i);
+                    if (match) {
+                        setQrInput(match[1]);
+                        stopScanner();
+                    } else {
+                        setQrInput(decodedText);
+                        stopScanner();
+                    }
+                },
+                (errorMessage) => {
+                    // Ignore scan errors, they happen frequently
+                }
+            );
+
+            setShowScanner(true);
+        } catch (error) {
+            console.error('Error starting scanner:', error);
+            alert('Failed to start camera. Please check permissions.');
+        }
+    };
+
+    const stopScanner = async () => {
+        if (scannerRef.current) {
+            try {
+                await scannerRef.current.stop();
+                scannerRef.current = null;
+                setShowScanner(false);
+            } catch (error) {
+                console.error('Error stopping scanner:', error);
+            }
+        }
+    };
+
+    const handleMarkAsPaid = async (ticketId: string) => {
+        if (!confirm('Mark this ticket as paid? This will generate a QR code and send an email to the user.')) return;
+
+        setUpdating(ticketId);
+
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'paid' })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                alert('✅ Ticket marked as paid! QR code generated and email sent.');
+                fetchTickets();
+            } else {
+                alert(`❌ ${data.error || 'Failed to update ticket'}`);
+            }
+        } catch (error) {
+            console.error('❌ Error marking ticket as paid:', error);
+            alert('Error updating ticket');
+        } finally {
+            setUpdating(null);
+        }
     };
 
     const handleRedeemByQR = async (e: React.FormEvent) => {
@@ -214,17 +302,40 @@ export default function TicketsAdminPage() {
                 <div className="card mb-4" style={{ backgroundColor: '#3a3f47', border: 'none' }}>
                     <div className="card-body">
                         <h5 className="text-warning mb-3">🔍 Scan QR Code for Entry</h5>
+                        
+                        {showScanner && (
+                            <div className="mb-3">
+                                <div id="qr-reader" style={{ width: '100%' }}></div>
+                                <button 
+                                    type="button"
+                                    className="btn btn-danger mt-2"
+                                    onClick={stopScanner}
+                                >
+                                    Stop Scanner
+                                </button>
+                            </div>
+                        )}
+                        
                         <form onSubmit={handleRedeemByQR} className="row g-3">
-                            <div className="col-md-10">
+                            <div className="col-md-8">
                                 <input
                                     type="text"
                                     className="form-control form-control-lg"
                                     style={{ backgroundColor: '#282c34', color: 'white', border: '1px solid #495057' }}
-                                    placeholder="Scan or enter QR code..."
+                                    placeholder="Scan or enter session token..."
                                     value={qrInput}
                                     onChange={(e) => setQrInput(e.target.value)}
-                                    autoFocus
+                                    autoFocus={!showScanner}
                                 />
+                            </div>
+                            <div className="col-md-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-info btn-lg w-100"
+                                    onClick={showScanner ? stopScanner : startScanner}
+                                >
+                                    <i className={`bi bi-${showScanner ? 'x' : 'camera'}`}></i> {showScanner ? 'Close' : 'Scan'}
+                                </button>
                             </div>
                             <div className="col-md-2">
                                 <button
@@ -376,9 +487,23 @@ export default function TicketsAdminPage() {
                                                 )}
                                             </button>
                                         ) : (
-                                            <div className="alert alert-warning mb-0 small">
-                                                Awaiting payment
-                                            </div>
+                                            <button
+                                                className="btn btn-warning w-100 text-dark fw-bold"
+                                                onClick={() => handleMarkAsPaid(ticket.id)}
+                                                disabled={updating === ticket.id}
+                                            >
+                                                {updating === ticket.id ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm me-2"></span>
+                                                        Processing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <i className="bi bi-credit-card me-2"></i>
+                                                        Mark as Paid
+                                                    </>
+                                                )}
+                                            </button>
                                         )}
                                     </div>
                                 </div>

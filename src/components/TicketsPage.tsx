@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getStoredSessionToken, storeSessionToken } from '../services/sessionService';
+import { 
+    getStoredSessionToken, 
+    createTicketSession,
+    storeSessionToken
+} from '../services/sessionService';
 
 interface TicketType {
     id: number;
@@ -12,21 +16,29 @@ interface TicketType {
     available: boolean;
 }
 
-interface PurchasedTicket {
+interface Ticket {
     id: string;
+    ticket_number: string;
     ticket_type_name: string;
     first_name: string;
     last_name: string;
     email: string;
     price: number;
-    status: string;
+    status: 'pending' | 'paid';
+    entry_redeemed: boolean;
+    created_at: string;
 }
 
 export default function TicketsPage() {
+    const [hasSession, setHasSession] = useState(false);
+    const [myTicket, setMyTicket] = useState<Ticket | null>(null);
     const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [purchasedTicket, setPurchasedTicket] = useState<PurchasedTicket | null>(null);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showQR, setShowQR] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
+    const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
 
     // Form state
     const [selectedTicketType, setSelectedTicketType] = useState<number | null>(null);
@@ -35,8 +47,44 @@ export default function TicketsPage() {
     const [email, setEmail] = useState('');
 
     useEffect(() => {
-        fetchTicketTypes();
+        const sessionToken = getStoredSessionToken();
+        setHasSession(!!sessionToken);
+        
+        if (sessionToken) {
+            loadMyTicket(sessionToken);
+        } else {
+            fetchTicketTypes();
+        }
+        setLoading(false);
     }, []);
+
+    const loadMyTicket = async (sessionToken: string) => {
+        try {
+            const res = await fetch(`/api/tickets?sessionToken=${sessionToken}`);
+            const data = await res.json();
+            
+            if (data.tickets && data.tickets.length > 0) {
+                setMyTicket(data.tickets[0]);
+                // Fetch QR code for this session
+                fetchQRCode(sessionToken);
+            }
+        } catch (error) {
+            console.error('Error loading ticket:', error);
+        }
+    };
+
+    const fetchQRCode = async (sessionToken: string) => {
+        try {
+            const res = await fetch(`/api/qr-code?token=${sessionToken}`);
+            const data = await res.json();
+            
+            if (data.qrDataUrl) {
+                setQrCodeDataUrl(data.qrDataUrl);
+            }
+        } catch (error) {
+            console.error('Error loading QR code:', error);
+        }
+    };
 
     const fetchTicketTypes = async () => {
         try {
@@ -62,9 +110,16 @@ export default function TicketsPage() {
 
         setSubmitting(true);
         try {
-            // Get existing session token
-            const sessionToken = getStoredSessionToken();
+            // Create ticket session for this user
+            const ticketSession = await createTicketSession(firstName, lastName, email);
             
+            if (!ticketSession) {
+                alert('Failed to create session');
+                setSubmitting(false);
+                return;
+            }
+            
+            // Create ticket linked to this session
             const res = await fetch('/api/tickets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -73,25 +128,20 @@ export default function TicketsPage() {
                     firstName,
                     lastName,
                     email,
-                    sessionToken // Include session token if exists
+                    sessionToken: ticketSession.session_token
                 })
             });
 
             if (res.ok) {
                 const data = await res.json();
-                setPurchasedTicket(data.ticket);
                 
-                // Store session token from response
-                if (data.sessionToken) {
-                    storeSessionToken(data.sessionToken);
-                    console.log('✅ Session token stored after ticket purchase');
-                }
+                // DO NOT store session here - user must access via email QR link
+                // Session will be stored when they click the QR link from email
                 
-                // Reset form
-                setSelectedTicketType(null);
-                setFirstName('');
-                setLastName('');
-                setEmail('');
+                // Show success message
+                setShowSuccess(true);
+                
+                console.log('✅ Ticket created and email sent - user must check email for QR link');
             } else {
                 const error = await res.json();
                 alert(`Failed to purchase ticket: ${error.error || 'Unknown error'}`);
@@ -104,49 +154,36 @@ export default function TicketsPage() {
         }
     };
 
-    // Show success message after purchase
-    if (purchasedTicket) {
+    // Success message after ticket request
+    if (showSuccess) {
         return (
-            <div className="dark-page d-flex align-items-center justify-content-center">
+            <div className="dark-page d-flex align-items-center justify-content-center min-vh-100">
                 <div className="container" style={{ maxWidth: '600px' }}>
                     <div className="card dark-card shadow-lg">
                         <div className="card-body p-5 text-center">
                             <div className="mb-4">
-                                <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '5rem' }}></i>
+                                <i className="bi bi-envelope-check-fill text-success" style={{ fontSize: '5rem' }}></i>
                             </div>
-                            <h2 className="mb-4 text-white">Ticket Reserved!</h2>
-                            <div className="alert alert-warning mb-4">
-                                <h5 className="mb-2">⚠️ Payment Pending</h5>
+                            <h2 className="mb-4 text-white">Check Your Email!</h2>
+                            <div className="alert alert-info mb-4">
+                                <p className="mb-2">
+                                    <strong>📧 Email sent to:</strong><br />
+                                    {email}
+                                </p>
                                 <p className="mb-0">
-                                    Your ticket has been reserved. Please proceed to the payment counter to complete your purchase.
+                                    Your ticket confirmation with QR code has been sent.
+                                    Click the link in the email to access your ticket.
                                 </p>
                             </div>
-                            <div className="text-start mb-4 p-4 ticket-details-box">
-                                <h5 className="text-warning mb-3">Ticket Details:</h5>
-                                <p className="mb-2"><strong>Type:</strong> {purchasedTicket.ticket_type_name}</p>
-                                <p className="mb-2"><strong>Name:</strong> {purchasedTicket.first_name} {purchasedTicket.last_name}</p>
-                                <p className="mb-2"><strong>Email:</strong> {purchasedTicket.email}</p>
-                                <p className="mb-2"><strong>Price:</strong> €{purchasedTicket.price.toFixed(2)}</p>
-                                <p className="mb-0"><strong>Status:</strong> <span className="badge bg-warning text-dark">Pending Payment</span></p>
-                            </div>
-                            <small className="text-muted d-block mb-4">
-                                A confirmation email will be sent once payment is confirmed.
-                                You will receive a QR code that serves as your entry ticket.
-                            </small>
-                            <div className="d-grid gap-2">
-                                <button
-                                    className="btn btn-success btn-lg"
-                                    onClick={() => setPurchasedTicket(null)}
-                                >
-                                    Purchase Another Ticket
-                                </button>
-                                <Link
-                                    href="/"
-                                    className="btn btn-outline-light text-decoration-none"
-                                >
-                                    Back to Home
-                                </Link>
-                            </div>
+                            <p className="text-muted small mb-4">
+                                The QR code in the email will let you access your ticket and place orders at the event.
+                            </p>
+                            <Link
+                                href="/"
+                                className="btn btn-warning btn-lg"
+                            >
+                                Return to Home
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -154,17 +191,267 @@ export default function TicketsPage() {
         );
     }
 
+    // User has session - show their ticket
+    if (hasSession && myTicket) {
+        return (
+            <div className="dark-page">
+                <div className="container py-5" style={{ maxWidth: '800px' }}>
+                    {/* Header */}
+                    <div className="d-flex justify-content-between align-items-center mb-5">
+                        <h1 className="display-4">🎫 My Ticket</h1>
+                        <Link href="/" className="btn btn-outline-light">
+                            ← Back
+                        </Link>
+                    </div>
+
+                    {/* Ticket Card */}
+                    <div className="card dark-card shadow-lg">
+                        <div className="card-body p-4">
+                            {/* QR Code Section */}
+                            <div className="text-center mb-4">
+                                {qrCodeDataUrl ? (
+                                    <div 
+                                        className="bg-white p-3 rounded d-inline-block mb-3"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => setShowQR(true)}
+                                    >
+                                        <img 
+                                            src={qrCodeDataUrl}
+                                            alt="QR Code"
+                                            style={{ width: '200px', height: '200px' }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="bg-white p-3 rounded d-inline-block mb-3">
+                                        <div 
+                                            className="d-flex align-items-center justify-content-center"
+                                            style={{ width: '200px', height: '200px' }}
+                                        >
+                                            <div className="spinner-border text-dark" role="status">
+                                                <span className="visually-hidden">Loading QR...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <p className="text-muted small mb-0">
+                                    <i className="bi bi-hand-index"></i> Click QR to enlarge
+                                </p>
+                            </div>
+
+                            {/* Ticket Number */}
+                            <div className="text-center mb-4">
+                                <h3 className="text-warning mb-1">#{myTicket.ticket_number}</h3>
+                                <p className="text-muted mb-0">{myTicket.ticket_type_name}</p>
+                            </div>
+
+                            {/* Status Badges */}
+                            <div className="d-grid gap-3 mb-4">
+                                {/* Payment Status */}
+                                {myTicket.status === 'pending' ? (
+                                    <Link
+                                        href="/payment"
+                                        className="btn btn-warning btn-lg"
+                                    >
+                                        💳 Pay Now - €{myTicket.price.toFixed(2)}
+                                    </Link>
+                                ) : (
+                                    <button className="btn btn-success btn-lg" disabled>
+                                        <i className="bi bi-check-circle-fill me-2"></i>
+                                        Paid
+                                    </button>
+                                )}
+
+                                {/* Details Button */}
+                                <button
+                                    className="btn btn-outline-light"
+                                    onClick={() => setShowDetails(!showDetails)}
+                                >
+                                    <i className={`bi bi-${showDetails ? 'chevron-up' : 'chevron-down'} me-2`}></i>
+                                    {myTicket.entry_redeemed ? '✓ Redeemed' : 'Not Redeemed'} - View Details
+                                </button>
+                            </div>
+
+                            {/* Expandable Details */}
+                            {showDetails && (
+                                <div className="alert alert-secondary">
+                                    <h6 className="mb-3">Ticket Details:</h6>
+                                    <p className="mb-2"><strong>Name:</strong> {myTicket.first_name} {myTicket.last_name}</p>
+                                    <p className="mb-2"><strong>Email:</strong> {myTicket.email}</p>
+                                    <p className="mb-2"><strong>Type:</strong> {myTicket.ticket_type_name}</p>
+                                    <p className="mb-2"><strong>Price:</strong> €{myTicket.price.toFixed(2)}</p>
+                                    <p className="mb-0"><strong>Created:</strong> {new Date(myTicket.created_at).toLocaleString()}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Request More Tickets Collapsable */}
+                    <div className="mt-4">
+                        <div className="accordion" id="requestMoreAccordion">
+                            <div className="accordion-item" style={{ backgroundColor: '#3a3f47', border: '1px solid #495057' }}>
+                                <h2 className="accordion-header">
+                                    <button 
+                                        className="accordion-button collapsed text-white" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseRequestMore"
+                                        style={{ backgroundColor: '#3a3f47', borderBottom: '1px solid #495057' }}
+                                    >
+                                        <i className="bi bi-plus-circle me-2"></i>
+                                        Request More Tickets
+                                    </button>
+                                </h2>
+                                <div 
+                                    id="collapseRequestMore" 
+                                    className="accordion-collapse collapse" 
+                                    data-bs-parent="#requestMoreAccordion"
+                                >
+                                    <div className="accordion-body" style={{ backgroundColor: '#282c34' }}>
+                                        <div className="alert alert-info mb-4">
+                                            <i className="bi bi-info-circle me-2"></i>
+                                            <strong>Note:</strong> This will create a new ticket request sent to the provided email. 
+                                            Each ticket has its own QR code and session.
+                                        </div>
+
+                                        <form onSubmit={handleSubmit}>
+                                            <div className="row g-3">
+                                                <div className="col-md-6">
+                                                    <label htmlFor="newFirstName" className="form-label">First Name *</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control dark-input"
+                                                        id="newFirstName"
+                                                        value={firstName}
+                                                        onChange={(e) => setFirstName(e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="col-md-6">
+                                                    <label htmlFor="newLastName" className="form-label">Last Name *</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control dark-input"
+                                                        id="newLastName"
+                                                        value={lastName}
+                                                        onChange={(e) => setLastName(e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="col-12">
+                                                    <label htmlFor="newEmail" className="form-label">Email Address *</label>
+                                                    <input
+                                                        type="email"
+                                                        className="form-control dark-input"
+                                                        id="newEmail"
+                                                        value={email}
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        required
+                                                    />
+                                                    <small className="text-muted">QR code will be sent to this email</small>
+                                                </div>
+
+                                                <div className="col-12">
+                                                    <label className="form-label">Select Ticket Type *</label>
+                                                    <div className="d-flex flex-column gap-2">
+                                                        {ticketTypes.map(ticket => (
+                                                            <div
+                                                                key={ticket.id}
+                                                                className={`card dark-card ${selectedTicketType === ticket.id ? 'border-warning' : ''}`}
+                                                                style={{ cursor: 'pointer' }}
+                                                                onClick={() => setSelectedTicketType(ticket.id)}
+                                                            >
+                                                                <div className="card-body p-3">
+                                                                    <div className="d-flex justify-content-between align-items-center">
+                                                                        <div>
+                                                                            <h6 className="mb-1 text-white">{ticket.name}</h6>
+                                                                            <small className="text-muted">{ticket.description}</small>
+                                                                        </div>
+                                                                        <div className="text-end">
+                                                                            <h5 className="mb-0 text-warning">€{ticket.price.toFixed(2)}</h5>
+                                                                            {selectedTicketType === ticket.id && (
+                                                                                <span className="badge bg-warning text-dark mt-1">Selected</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12">
+                                                    <button
+                                                        type="submit"
+                                                        className="btn btn-warning btn-lg w-100"
+                                                        disabled={!selectedTicketType || submitting}
+                                                    >
+                                                        {submitting ? (
+                                                            <>
+                                                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                                                Sending Request...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <i className="bi bi-envelope me-2"></i>
+                                                                Request Ticket
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* QR Code Full Screen Modal */}
+                {showQR && qrCodeDataUrl && (
+                    <div 
+                        className="modal d-block" 
+                        style={{ 
+                            backgroundColor: 'rgba(0,0,0,0.95)',
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            zIndex: 1050,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                        onClick={() => setShowQR(false)}
+                    >
+                        <div className="text-center">
+                            <div className="bg-white p-4 rounded d-inline-block">
+                                <img 
+                                    src={qrCodeDataUrl}
+                                    alt="QR Code"
+                                    style={{ width: '400px', height: '400px' }}
+                                />
+                            </div>
+                            <p className="text-white mt-3">Tap anywhere to close</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // No session - show ticket request form
     return (
         <div className="dark-page">
             <div className="container py-5">
                 {/* Header */}
                 <div className="d-flex justify-content-between align-items-center mb-5">
-                    <h1 className="display-4">🎫 Get Tickets</h1>
-                    <Link
-                        href="/"
-                        className="btn btn-outline-light text-decoration-none"
-                    >
-                        ← Back to Home
+                    <h1 className="display-4">🎫 Request Ticket</h1>
+                    <Link href="/" className="btn btn-outline-light">
+                        ← Back
                     </Link>
                 </div>
 

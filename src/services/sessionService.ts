@@ -1,7 +1,7 @@
-// Session management utility for localStorage and API integration
-// Handles session creation, retrieval, and persistence
+// Session management utility for ticket-based access
+// Each ticket purchase creates a session - no device sessions
 
-const SESSION_KEY = 'commandapp_session_token';
+const TICKET_SESSION_KEY = 'commandapp_ticket_session';
 
 export interface Session {
     id: string;
@@ -13,144 +13,171 @@ export interface Session {
     last_accessed_at: string;
 }
 
+export interface TicketInfo {
+    ticket_id: string;
+    ticket_number: string;
+    ticket_type_name: string;
+    status: 'pending' | 'paid';
+    entry_redeemed: boolean;
+    price: number;
+    created_at: string;
+}
+
 /**
- * Get session token from localStorage
+ * Get current ticket session token from localStorage
  */
 export const getStoredSessionToken = (): string | null => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(SESSION_KEY);
+    return localStorage.getItem(TICKET_SESSION_KEY);
 };
 
 /**
- * Store session token in localStorage
+ * Store ticket session token in localStorage
  */
 export const storeSessionToken = (token: string): void => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(SESSION_KEY, token);
-    console.log('💾 [SessionService] Session token stored:', token);
+    localStorage.setItem(TICKET_SESSION_KEY, token);
+    console.log('💾 [SessionService] Ticket session token stored:', token);
 };
 
 /**
- * Clear session token from localStorage
+ * Clear ticket session token from localStorage
  */
 export const clearSessionToken = (): void => {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(SESSION_KEY);
-    console.log('🗑️ [SessionService] Session token cleared');
+    localStorage.removeItem(TICKET_SESSION_KEY);
+    console.log('🗑️ [SessionService] Ticket session token cleared');
 };
 
 /**
- * Create or retrieve session
- * If user has a stored token, validates it
- * Otherwise creates new session with user info
+ * Check if user has an active session (has ticket)
  */
-export const getOrCreateSession = async (
-    firstName: string,
-    lastName: string,
-    email: string
-): Promise<Session | null> => {
+export const hasActiveSession = (): boolean => {
+    return getStoredSessionToken() !== null;
+};
+
+/**
+ * Create device session (called on app load if none exists)
+ * This session is permanent and tied to the device
+ */
+export const createDeviceSession = async (): Promise<Session | null> => {
     try {
-        const existingToken = getStoredSessionToken();
-        
-        console.log('🔐 [SessionService] Getting or creating session...');
-        console.log('   Existing token:', existingToken ? 'Found' : 'None');
-        console.log('   User:', firstName, lastName, email);
+        console.log('🔐 [SessionService] Creating device session...');
 
         const response = await fetch('/api/sessions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName,
-                lastName,
-                email,
-                existingToken
-            })
+            body: JSON.stringify({ anonymous: true, device: true })
         });
 
         if (!response.ok) {
-            console.error('❌ [SessionService] Failed to create/get session');
+            console.error('❌ [SessionService] Failed to create device session');
             return null;
         }
 
         const data = await response.json();
         const session = data.session;
 
-        // Store the token
+        // Store the device token (never changes)
         storeSessionToken(session.session_token);
 
-        if (data.existing) {
-            console.log('✅ [SessionService] Retrieved existing session:', session.id);
-        } else {
-            console.log('✅ [SessionService] Created new session:', session.id);
-        }
-
+        console.log('✅ [SessionService] Created device session:', session.id);
         return session;
     } catch (error) {
-        console.error('❌ [SessionService] Error in getOrCreateSession:', error);
+        console.error('❌ [SessionService] Error in createDeviceSession:', error);
         return null;
     }
 };
 
 /**
- * Retrieve session from API by token
+ * Create a new ticket session (for each ticket purchase)
+ * Does NOT update device session token
  */
-export const getSessionByToken = async (token: string): Promise<Session | null> => {
+export const createTicketSession = async (
+    firstName: string,
+    lastName: string,
+    email: string
+): Promise<Session | null> => {
     try {
-        console.log('🔍 [SessionService] Fetching session by token:', token);
-        
-        const response = await fetch(`/api/sessions?token=${token}`);
+        console.log('🎫 [SessionService] Creating ticket session for:', email);
+
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                anonymous: false,
+                firstName: firstName,    // ← Changed from first_name
+                lastName: lastName,      // ← Changed from last_name
+                email: email
+            })
+        });
 
         if (!response.ok) {
-            console.error('❌ [SessionService] Session not found');
+            const error = await response.json();
+            console.error('❌ [SessionService] Failed to create ticket session:', error);
             return null;
         }
 
         const data = await response.json();
-        console.log('✅ [SessionService] Session retrieved:', data.session.id);
+        console.log('✅ [SessionService] Created ticket session:', data.session.id);
+        return data.session;
+    } catch (error) {
+        console.error('❌ [SessionService] Error in createTicketSession:', error);
+        return null;
+    }
+};
+
+/**
+ * Get current session info from API
+ */
+export const getCurrentSession = async (): Promise<Session | null> => {
+    const token = getStoredSessionToken();
+    if (!token) return null;
+
+    try {
+        const response = await fetch(`/api/sessions?token=${token}`);
+        if (!response.ok) return null;
         
-        // Update stored token
+        const data = await response.json();
+        return data.session;
+    } catch (error) {
+        console.error('❌ [SessionService] Error getting session:', error);
+        return null;
+    }
+};;
+
+/**
+ * Validate and restore session from token (e.g., from QR code link)
+ */
+export const restoreSessionFromToken = async (token: string): Promise<Session | null> => {
+    try {
+        console.log('🔄 [SessionService] Restoring session from token...');
+        
+        const response = await fetch(`/api/sessions?token=${token}`);
+        if (!response.ok) return null;
+        
+        const data = await response.json();
+        
+        // Store token locally
         storeSessionToken(token);
+        console.log('✅ [SessionService] Session restored:', data.session.id);
         
         return data.session;
     } catch (error) {
-        console.error('❌ [SessionService] Error fetching session:', error);
+        console.error('❌ [SessionService] Error restoring session:', error);
         return null;
     }
 };
 
 /**
- * Validate current session token
- */
-export const validateSession = async (): Promise<Session | null> => {
-    const token = getStoredSessionToken();
-    
-    if (!token) {
-        console.log('ℹ️ [SessionService] No session token found');
-        return null;
-    }
-
-    return await getSessionByToken(token);
-};
-
-/**
- * Get app link with session token for sharing (e.g., in QR code)
+ * Get session link for QR code/email
  */
 export const getSessionLink = (sessionToken: string): string => {
     if (typeof window === 'undefined') {
-        return `https://yourapp.com/session/${sessionToken}`;
+        return `${process.env.NEXT_PUBLIC_APP_URL || 'https://yourapp.com'}/qr/${sessionToken}`;
     }
-    return `${window.location.origin}/session/${sessionToken}`;
-};
-
-/**
- * Generate QR code data that includes session token
- * This will be used in ticket QR codes
- */
-export const generateQRData = (qrCode: string, sessionToken: string): string => {
-    // QR data format: QR_CODE|SESSION_TOKEN
-    // This allows both ticket validation AND session recovery
-    return `${qrCode}|${sessionToken}`;
-};
+    return `${window.location.origin}/qr/${sessionToken}`;
+};;
 
 /**
  * Parse QR code data to extract QR code and session token

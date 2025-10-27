@@ -12,7 +12,7 @@ interface ProductProps {
 
 const Product: React.FC<ProductProps> = ({ id, name, price, image, details }) => {
     const [quantity, setQuantity] = useState(0);
-    const { addToCart, updateCartQuantity, getProductById } = useProducts();
+    const { addToCart, updateCartQuantity, getProductById, isServiceOpen } = useProducts();
 
     // Sync local state with context state
     useEffect(() => {
@@ -24,6 +24,7 @@ const Product: React.FC<ProductProps> = ({ id, name, price, image, details }) =>
 
     // Handlers for incrementing and decrementing the quantity
     const incrementQuantity = () => {
+        if (!isServiceOpen) return; // Don't allow adding items when closed
         const newQuantity = quantity + 1;
         setQuantity(newQuantity);
         addToCart(id, 1); // Add one to cart
@@ -31,6 +32,7 @@ const Product: React.FC<ProductProps> = ({ id, name, price, image, details }) =>
     };
 
     const decrementQuantity = () => {
+        if (!isServiceOpen) return; // Don't allow removing items when closed
         if (quantity > 0) {
             const newQuantity = quantity - 1;
             setQuantity(newQuantity);
@@ -64,6 +66,7 @@ const Product: React.FC<ProductProps> = ({ id, name, price, image, details }) =>
                                     type="button"
                                     className="btn btn-sm btn-outline-success"
                                     onClick={incrementQuantity}
+                                    disabled={!isServiceOpen}
                                     style={{ width: '32px', height: '32px', padding: '0', flexShrink: 0 }}
                                 >
                                     +
@@ -80,6 +83,7 @@ const Product: React.FC<ProductProps> = ({ id, name, price, image, details }) =>
                                     type="button"
                                     className="btn btn-sm btn-outline-danger"
                                     onClick={decrementQuantity}
+                                    disabled={!isServiceOpen}
                                     style={{ width: '32px', height: '32px', padding: '0', flexShrink: 0 }}
                                 >
                                     -

@@ -2,12 +2,12 @@ import React from 'react'
 import { useProducts } from '../context/ProductsDataContext';
 
 function CartBar() {
-    const { cartTotal, getCartItems, navigateToResume } = useProducts();
+    const { cartTotal, getCartItems, navigateToResume, isServiceOpen } = useProducts();
     const cartItems = getCartItems();
     const itemCount = cartItems.reduce((sum, item) => sum + item.quantityInCart, 0);
 
     const handleCartClick = () => {
-        if (itemCount > 0) {
+        if (isServiceOpen && itemCount > 0) {
             navigateToResume();
         }
     };
@@ -19,7 +19,7 @@ function CartBar() {
                     className="navbar-brand text-white"
                     href="#"
                     onClick={handleCartClick}
-                    style={{ cursor: itemCount > 0 ? 'pointer' : 'default' }}
+                    style={{ cursor: (isServiceOpen && itemCount > 0) ? 'pointer' : 'default' }}
                 >
                     Cart {itemCount > 0 && `(${itemCount})`}
                 </a>
@@ -28,9 +28,9 @@ function CartBar() {
                     className="btn btn-warning"
                     type="button"
                     onClick={handleCartClick}
-                    disabled={itemCount === 0}
+                    disabled={!isServiceOpen || itemCount === 0}
                 >
-                    Checkout ${cartTotal.toFixed(2)}
+                    {!isServiceOpen ? 'We are closed at the moment!' : `Checkout $${cartTotal.toFixed(2)}`}
                 </button>
             </div>
         </nav>
