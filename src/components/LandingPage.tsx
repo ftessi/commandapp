@@ -15,7 +15,7 @@ export default function LandingPage() {
         const checkSessionAndPayment = async () => {
             const session = hasActiveSession();
             setHasSession(session);
-            
+
             if (session) {
                 // Fetch ticket to check payment status
                 const token = getStoredSessionToken();
@@ -33,11 +33,11 @@ export default function LandingPage() {
                     console.error('Error fetching ticket status:', error);
                 }
             }
-            
+
             setChecking(false);
             console.log('🔐 User has session:', session);
         };
-        
+
         checkSessionAndPayment();
     }, []);
     return (

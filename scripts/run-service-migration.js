@@ -49,10 +49,10 @@ async function runMigration() {
             if (error) {
                 // Try direct query as fallback
                 const { error: queryError } = await supabase.from('_').select().limit(0);
-                
+
                 if (queryError && queryError.message.includes('does not exist')) {
                     console.log('⚠️  Using alternative approach for table creation...');
-                    
+
                     // For Supabase, we need to use the SQL editor or direct connection
                     console.log('\n📝 Please run this SQL directly in your Supabase SQL Editor:');
                     console.log('https://supabase.com/dashboard/project/_/sql\n');
@@ -60,7 +60,7 @@ async function runMigration() {
                     console.log('\n');
                     return;
                 }
-                
+
                 throw error;
             }
 

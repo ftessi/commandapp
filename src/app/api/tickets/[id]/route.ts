@@ -128,17 +128,17 @@ export async function PATCH(
 
         console.log('✅ Ticket updated successfully:', data);
 
-        // If marked as paid, generate QR and send email
-        if (status === 'paid' && data.qr_code && data.sessions) {
+        // If marked as paid, send email with QR code (QR uses session_token)
+        if (status === 'paid' && data.sessions) {
             console.log('📧 Ticket marked as paid, generating QR and sending email...');
-            
+
             try {
                 const sessionToken = data.sessions.session_token;
-                
+
                 // Generate QR code
                 const qrCodeDataUrl = await generateSessionQR(sessionToken);
                 console.log('✅ QR code generated');
-                
+
                 // Send email
                 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
                 const emailSent = await sendTicketEmail({
@@ -151,7 +151,7 @@ export async function PATCH(
                     sessionToken,
                     appUrl
                 });
-                
+
                 if (emailSent) {
                     console.log('✅ Email sent successfully');
                 } else {

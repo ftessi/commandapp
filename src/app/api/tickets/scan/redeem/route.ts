@@ -1,5 +1,5 @@
-// API Route: PATCH /api/tickets/scan/redeem - Redeem ticket by QR code scan
-// This is a convenience endpoint for QR scanning
+// API Route: PATCH /api/tickets/scan/redeem - Redeem ticket by session token scan
+// This is a convenience endpoint for QR scanning (QR contains session_token)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -17,16 +17,16 @@ try {
 }
 
 export async function PATCH(request: NextRequest) {
-    console.log('🔍 PATCH /api/tickets/scan/redeem - Redeeming ticket by QR scan');
+    console.log('🔍 PATCH /api/tickets/scan/redeem - Redeeming ticket by session token scan');
     try {
         const body = await request.json();
-        const { qrCode, adminName } = body;
+        const { sessionToken, adminName } = body;
 
-        console.log('📦 Scan redeem request - qrCode:', qrCode, 'admin:', adminName);
+        console.log('📦 Scan redeem request - sessionToken:', sessionToken, 'admin:', adminName);
 
-        if (!qrCode) {
+        if (!sessionToken) {
             return NextResponse.json(
-                { error: 'QR code is required' },
+                { error: 'Session token is required' },
                 { status: 400 }
             );
         }
@@ -39,7 +39,22 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        // Lookup ticket by QR code
+        // Lookup ticket by session token
+        // First find the session, then get the ticket
+        const { data: session, error: sessionError } = await supabase
+            .from('sessions')
+            .select('id')
+            .eq('session_token', sessionToken)
+            .single();
+
+        if (sessionError || !session) {
+            console.error('❌ Session not found for token:', sessionError);
+            return NextResponse.json(
+                { error: 'Session not found' },
+                { status: 404 }
+            );
+        }
+
         const { data: ticket, error: fetchError } = await supabase
             .from('tickets')
             .select(`
@@ -51,11 +66,11 @@ export async function PATCH(request: NextRequest) {
                     email
                 )
             `)
-            .eq('qr_code', qrCode)
+            .eq('session_id', session.id)
             .single();
 
         if (fetchError || !ticket) {
-            console.error('❌ Ticket not found for QR code:', fetchError);
+            console.error('❌ Ticket not found for session:', fetchError);
             return NextResponse.json(
                 { error: 'Ticket not found' },
                 { status: 404 }
@@ -77,8 +92,8 @@ export async function PATCH(request: NextRequest) {
         if (ticket.entry_redeemed) {
             console.error('❌ Ticket already redeemed for entry at:', ticket.entry_redeemed_at);
             return NextResponse.json(
-                { 
-                    error: 'Ticket already used for entry', 
+                {
+                    error: 'Ticket already used for entry',
                     ticket,
                     redeemedAt: ticket.entry_redeemed_at,
                     redeemedBy: ticket.entry_redeemed_by
@@ -115,9 +130,9 @@ export async function PATCH(request: NextRequest) {
         }
 
         console.log('✅ Ticket redeemed for entry:', updatedTicket.id, 'at:', updatedTicket.entry_redeemed_at);
-        return NextResponse.json({ 
+        return NextResponse.json({
             ticket: updatedTicket,
-            message: 'Ticket successfully redeemed for entry' 
+            message: 'Ticket successfully redeemed for entry'
         }, { status: 200 });
 
     } catch (err: any) {

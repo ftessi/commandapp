@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         if (existingSessions && existingSessions.length > 0) {
             console.log('✅ Existing session found for email:', email);
             const session = existingSessions[0];
-            
+
             // Update last accessed
             await supabase
                 .from('sessions')
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('✅ Session found:', session.id);
-        
+
         // Update last accessed
         await supabase
             .from('sessions')
@@ -232,7 +232,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         console.log('🔍 Updating session:', sessionToken);
-        
+
         const { data: updatedSession, error } = await supabase
             .from('sessions')
             .update({

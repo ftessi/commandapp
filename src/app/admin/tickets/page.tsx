@@ -6,17 +6,18 @@ import { Html5Qrcode } from 'html5-qrcode';
 
 interface Ticket {
     id: string;
+    ticket_number: string;
     ticket_type_name: string;
     first_name: string;
     last_name: string;
     email: string;
     price: number;
     status: string;
-    qr_code: string;
     entry_redeemed: boolean;
     entry_redeemed_at: string | null;
     entry_redeemed_by: string | null;
     sessions?: {
+        session_token: string;
         first_name: string;
         last_name: string;
         email: string;
@@ -96,6 +97,7 @@ export default function TicketsAdminPage() {
         if (searchTerm.trim()) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(t =>
+                t.ticket_number?.toLowerCase().includes(term) ||
                 t.first_name.toLowerCase().includes(term) ||
                 t.last_name.toLowerCase().includes(term) ||
                 t.email.toLowerCase().includes(term) ||
@@ -184,7 +186,7 @@ export default function TicketsAdminPage() {
 
     const handleRedeemByQR = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!qrInput.trim()) {
             alert('Please enter a QR code');
             return;
@@ -302,11 +304,11 @@ export default function TicketsAdminPage() {
                 <div className="card mb-4" style={{ backgroundColor: '#3a3f47', border: 'none' }}>
                     <div className="card-body">
                         <h5 className="text-warning mb-3">🔍 Scan QR Code for Entry</h5>
-                        
+
                         {showScanner && (
                             <div className="mb-3">
                                 <div id="qr-reader" style={{ width: '100%' }}></div>
-                                <button 
+                                <button
                                     type="button"
                                     className="btn btn-danger mt-2"
                                     onClick={stopScanner}
@@ -315,7 +317,7 @@ export default function TicketsAdminPage() {
                                 </button>
                             </div>
                         )}
-                        
+
                         <form onSubmit={handleRedeemByQR} className="row g-3">
                             <div className="col-md-8">
                                 <input
@@ -446,11 +448,18 @@ export default function TicketsAdminPage() {
                             <div key={ticket.id} className="col-md-6 col-lg-4">
                                 <div className="card h-100" style={{ backgroundColor: '#3a3f47', border: 'none' }}>
                                     <div className="card-body">
+                                        {/* Ticket Number - PROMINENT */}
+                                        <div className="text-center mb-3">
+                                            <div className="badge bg-warning text-dark fs-5 px-3 py-2">
+                                                {ticket.ticket_number || 'Pending...'}
+                                            </div>
+                                        </div>
+
                                         <div className="d-flex justify-content-between align-items-start mb-3">
                                             <h5 className="text-warning mb-0">{ticket.ticket_type_name}</h5>
                                             {getStatusBadge(ticket)}
                                         </div>
-                                        
+
                                         <div className="mb-3">
                                             <p className="mb-1 text-white">
                                                 <strong>{ticket.sessions?.first_name || ticket.first_name} {ticket.sessions?.last_name || ticket.last_name}</strong>

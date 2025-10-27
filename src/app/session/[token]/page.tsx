@@ -12,7 +12,7 @@ export default function SessionRecoveryPage({ params }: { params: { token: strin
     useEffect(() => {
         const recoverSession = async () => {
             const token = params.token;
-            
+
             if (!token) {
                 setError('No session token provided');
                 setLoading(false);
@@ -20,10 +20,10 @@ export default function SessionRecoveryPage({ params }: { params: { token: strin
             }
 
             console.log('🔄 Recovering session from token:', token);
-            
+
             try {
                 const restored = await restoreSessionFromToken(token);
-                
+
                 if (restored) {
                     console.log('✅ Session recovered successfully');
                     // Redirect to tickets page after 1 second

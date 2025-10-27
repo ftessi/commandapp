@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-    getStoredSessionToken, 
+import {
+    getStoredSessionToken,
     createTicketSession,
-    storeSessionToken
+    storeSessionToken,
+    clearSessionToken
 } from '../services/sessionService';
 
 interface TicketType {
@@ -50,26 +51,35 @@ export default function TicketsPage() {
         const sessionToken = getStoredSessionToken();
         setHasSession(!!sessionToken);
         
+        // Always fetch ticket types (needed for "Request More Tickets" section)
+        fetchTicketTypes();
+        
         if (sessionToken) {
             loadMyTicket(sessionToken);
-        } else {
-            fetchTicketTypes();
         }
         setLoading(false);
-    }, []);
-
-    const loadMyTicket = async (sessionToken: string) => {
+    }, []);    const loadMyTicket = async (sessionToken: string) => {
         try {
             const res = await fetch(`/api/tickets?sessionToken=${sessionToken}`);
             const data = await res.json();
-            
+
             if (data.tickets && data.tickets.length > 0) {
                 setMyTicket(data.tickets[0]);
                 // Fetch QR code for this session
                 fetchQRCode(sessionToken);
+            } else {
+                // Session doesn't exist or no tickets found - clear localStorage
+                console.log('Session not found, clearing localStorage');
+                clearSessionToken();
+                setHasSession(false);
+                fetchTicketTypes();
             }
         } catch (error) {
             console.error('Error loading ticket:', error);
+            // On error, also clear localStorage to allow fresh start
+            clearSessionToken();
+            setHasSession(false);
+            fetchTicketTypes();
         }
     };
 
@@ -77,7 +87,7 @@ export default function TicketsPage() {
         try {
             const res = await fetch(`/api/qr-code?token=${sessionToken}`);
             const data = await res.json();
-            
+
             if (data.qrDataUrl) {
                 setQrCodeDataUrl(data.qrDataUrl);
             }
@@ -112,13 +122,13 @@ export default function TicketsPage() {
         try {
             // Create ticket session for this user
             const ticketSession = await createTicketSession(firstName, lastName, email);
-            
+
             if (!ticketSession) {
                 alert('Failed to create session');
                 setSubmitting(false);
                 return;
             }
-            
+
             // Create ticket linked to this session
             const res = await fetch('/api/tickets', {
                 method: 'POST',
@@ -134,13 +144,13 @@ export default function TicketsPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                
+
                 // DO NOT store session here - user must access via email QR link
                 // Session will be stored when they click the QR link from email
-                
+
                 // Show success message
                 setShowSuccess(true);
-                
+
                 console.log('✅ Ticket created and email sent - user must check email for QR link');
             } else {
                 const error = await res.json();
@@ -210,12 +220,12 @@ export default function TicketsPage() {
                             {/* QR Code Section */}
                             <div className="text-center mb-4">
                                 {qrCodeDataUrl ? (
-                                    <div 
+                                    <div
                                         className="bg-white p-3 rounded d-inline-block mb-3"
                                         style={{ cursor: 'pointer' }}
                                         onClick={() => setShowQR(true)}
                                     >
-                                        <img 
+                                        <img
                                             src={qrCodeDataUrl}
                                             alt="QR Code"
                                             style={{ width: '200px', height: '200px' }}
@@ -223,7 +233,7 @@ export default function TicketsPage() {
                                     </div>
                                 ) : (
                                     <div className="bg-white p-3 rounded d-inline-block mb-3">
-                                        <div 
+                                        <div
                                             className="d-flex align-items-center justify-content-center"
                                             style={{ width: '200px', height: '200px' }}
                                         >
@@ -240,7 +250,11 @@ export default function TicketsPage() {
 
                             {/* Ticket Number */}
                             <div className="text-center mb-4">
-                                <h3 className="text-warning mb-1">#{myTicket.ticket_number}</h3>
+                                <div className="alert alert-warning d-inline-block px-4 py-2 mb-2">
+                                    <h2 className="mb-0 fw-bold">
+                                        {myTicket.ticket_number || 'Pending...'}
+                                    </h2>
+                                </div>
                                 <p className="text-muted mb-0">{myTicket.ticket_type_name}</p>
                             </div>
 
@@ -290,10 +304,10 @@ export default function TicketsPage() {
                         <div className="accordion" id="requestMoreAccordion">
                             <div className="accordion-item" style={{ backgroundColor: '#3a3f47', border: '1px solid #495057' }}>
                                 <h2 className="accordion-header">
-                                    <button 
-                                        className="accordion-button collapsed text-white" 
-                                        type="button" 
-                                        data-bs-toggle="collapse" 
+                                    <button
+                                        className="accordion-button collapsed text-white"
+                                        type="button"
+                                        data-bs-toggle="collapse"
                                         data-bs-target="#collapseRequestMore"
                                         style={{ backgroundColor: '#3a3f47', borderBottom: '1px solid #495057' }}
                                     >
@@ -301,15 +315,15 @@ export default function TicketsPage() {
                                         Request More Tickets
                                     </button>
                                 </h2>
-                                <div 
-                                    id="collapseRequestMore" 
-                                    className="accordion-collapse collapse" 
+                                <div
+                                    id="collapseRequestMore"
+                                    className="accordion-collapse collapse"
                                     data-bs-parent="#requestMoreAccordion"
                                 >
                                     <div className="accordion-body" style={{ backgroundColor: '#282c34' }}>
                                         <div className="alert alert-info mb-4">
                                             <i className="bi bi-info-circle me-2"></i>
-                                            <strong>Note:</strong> This will create a new ticket request sent to the provided email. 
+                                            <strong>Note:</strong> This will create a new ticket request sent to the provided email.
                                             Each ticket has its own QR code and session.
                                         </div>
 
@@ -411,9 +425,9 @@ export default function TicketsPage() {
 
                 {/* QR Code Full Screen Modal */}
                 {showQR && qrCodeDataUrl && (
-                    <div 
-                        className="modal d-block" 
-                        style={{ 
+                    <div
+                        className="modal d-block"
+                        style={{
                             backgroundColor: 'rgba(0,0,0,0.95)',
                             position: 'fixed',
                             top: 0,
@@ -429,7 +443,7 @@ export default function TicketsPage() {
                     >
                         <div className="text-center">
                             <div className="bg-white p-4 rounded d-inline-block">
-                                <img 
+                                <img
                                     src={qrCodeDataUrl}
                                     alt="QR Code"
                                     style={{ width: '400px', height: '400px' }}

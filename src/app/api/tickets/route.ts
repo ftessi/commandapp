@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         console.log('📦 Request body:', body);
-        const { ticketTypeId, firstName, lastName, email, sessionToken } = body;
+        const { ticketTypeId, firstName, lastName, email } = body;
 
         if (!ticketTypeId || !firstName || !lastName || !email) {
             console.error('❌ Missing required fields');
@@ -40,45 +40,30 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get or create session
-        let sessionId = null;
-        if (sessionToken) {
-            console.log('🔍 Looking up session by token:', sessionToken);
-            const { data: session } = await supabase
-                .from('sessions')
-                .select('id')
-                .eq('session_token', sessionToken)
-                .single();
-            
-            if (session) {
-                sessionId = session.id;
-                console.log('✅ Found existing session:', sessionId);
-            }
+        // ALWAYS create a NEW session for EACH ticket
+        // Each ticket is independent with its own QR code
+        console.log('➕ Creating new session for ticket (1 ticket = 1 session = 1 QR)');
+        const { data: newSession, error: sessionError } = await supabase
+            .from('sessions')
+            .insert([{
+                first_name: firstName,
+                last_name: lastName,
+                email: email.toLowerCase()
+            }])
+            .select('*')
+            .single();
+
+        if (sessionError) {
+            console.error('❌ Error creating session:', sessionError);
+            return NextResponse.json(
+                { error: 'Failed to create session' },
+                { status: 500 }
+            );
         }
 
-        if (!sessionId) {
-            console.log('➕ Creating new session for ticket purchase');
-            const { data: newSession, error: sessionError } = await supabase
-                .from('sessions')
-                .insert([{
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: email.toLowerCase()
-                }])
-                .select('*')
-                .single();
-
-            if (sessionError) {
-                console.error('❌ Error creating session:', sessionError);
-                return NextResponse.json(
-                    { error: 'Failed to create session' },
-                    { status: 500 }
-                );
-            }
-            
-            sessionId = newSession.id;
-            console.log('✅ Created session:', sessionId, 'Token:', newSession.session_token);
-        }
+        const sessionId = newSession.id;
+        const sessionToken = newSession.session_token;
+        console.log('✅ Created NEW session for this ticket:', sessionId, 'Token:', sessionToken);
 
         // Get ticket type details
         const { data: ticketType, error: ticketTypeError } = await supabase
@@ -122,43 +107,35 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log('✅ Ticket created:', ticket.id, 'linked to session:', sessionId);
-        
-        // Get session token to return to client
-        const { data: session } = await supabase
-            .from('sessions')
-            .select('session_token')
-            .eq('id', sessionId)
-            .single();
+        console.log('✅ Ticket created:', ticket.id, 'linked to NEW session:', sessionId);
 
         // Generate QR code and send email immediately
-        if (session?.session_token) {
-            try {
-                console.log('📧 Generating QR and sending email...');
-                const qrDataUrl = await generateSessionQR(session.session_token);
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yourapp.com';
-                
-                await sendTicketEmail({
-                    to: email.toLowerCase(),
-                    firstName,
-                    lastName,
-                    ticketType: ticketType.name,
-                    price: ticketType.price,
-                    qrCodeDataUrl: qrDataUrl,
-                    sessionToken: session.session_token,
-                    appUrl
-                });
-                
-                console.log('✅ Email sent to:', email);
-            } catch (emailError) {
-                console.error('⚠️ Failed to send email:', emailError);
-                // Don't fail the ticket creation if email fails
-            }
+        // Session token is already available from the new session we created
+        try {
+            console.log('📧 Generating QR and sending email...');
+            const qrDataUrl = await generateSessionQR(sessionToken);
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yourapp.com';
+
+            await sendTicketEmail({
+                to: email.toLowerCase(),
+                firstName,
+                lastName,
+                ticketType: ticketType.name,
+                price: ticketType.price,
+                qrCodeDataUrl: qrDataUrl,
+                sessionToken: sessionToken,
+                appUrl
+            });
+
+            console.log('✅ Email sent to:', email);
+        } catch (emailError) {
+            console.error('⚠️ Failed to send email:', emailError);
+            // Don't fail the ticket creation if email fails
         }
 
-        return NextResponse.json({ 
-            ticket, 
-            sessionToken: session?.session_token 
+        return NextResponse.json({
+            ticket,
+            sessionToken: sessionToken
         }, { status: 201 });
 
     } catch (err: any) {
@@ -176,11 +153,10 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
         const search = searchParams.get('search'); // Search by name or email
-        const qrCode = searchParams.get('qrCode');
         const sessionToken = searchParams.get('sessionToken');
         const limit = parseInt(searchParams.get('limit') || '100');
 
-        console.log('🔍 Query params - status:', status, 'search:', search, 'qrCode:', qrCode, 'sessionToken:', sessionToken, 'limit:', limit);
+        console.log('🔍 Query params - status:', status, 'search:', search, 'sessionToken:', sessionToken, 'limit:', limit);
 
         if (!supabase) {
             console.warn('⚠️ Supabase not configured');
@@ -209,7 +185,7 @@ export async function GET(request: NextRequest) {
                 .select('id')
                 .eq('session_token', sessionToken)
                 .single();
-            
+
             if (session) {
                 query = query.eq('session_id', session.id);
                 console.log('✅ Filtering tickets for session:', session.id);
@@ -222,10 +198,6 @@ export async function GET(request: NextRequest) {
         // Apply other filters
         if (status) {
             query = query.eq('status', status);
-        }
-
-        if (qrCode) {
-            query = query.eq('qr_code', qrCode);
         }
 
         if (search) {

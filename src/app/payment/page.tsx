@@ -22,7 +22,7 @@ export default function PaymentPage() {
                         </div>
 
                         <h2 className="text-center text-warning mb-4">Payment at Venue</h2>
-                        
+
                         <div className="alert alert-info mb-4">
                             <p className="mb-0">
                                 <strong>ℹ️ Please Note:</strong> All ticket payments are processed on-site at the venue counter.
@@ -30,7 +30,7 @@ export default function PaymentPage() {
                         </div>
 
                         <h4 className="mb-3">We Accept:</h4>
-                        
+
                         <div className="row g-3 mb-4">
                             {/* Cash */}
                             <div className="col-md-6">
@@ -101,7 +101,7 @@ export default function PaymentPage() {
                 <div className="card dark-card shadow-lg">
                     <div className="card-body p-4">
                         <h4 className="mb-4">Frequently Asked Questions</h4>
-                        
+
                         <div className="mb-3">
                             <h6 className="text-warning">Can I pay online in advance?</h6>
                             <p className="text-muted small mb-0">

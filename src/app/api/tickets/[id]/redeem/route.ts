@@ -24,9 +24,9 @@ export async function PATCH(
     try {
         const ticketId = params.id;
         const body = await request.json();
-        const { adminName, qrCode } = body;
+        const { adminName, sessionToken } = body;
 
-        console.log('📦 Redeem request - ticketId:', ticketId, 'qrCode:', qrCode, 'admin:', adminName);
+        console.log('📦 Redeem request - ticketId:', ticketId, 'sessionToken:', sessionToken, 'admin:', adminName);
 
         if (!supabase) {
             console.error('❌ Supabase not configured');
@@ -36,7 +36,7 @@ export async function PATCH(
             );
         }
 
-        // Lookup ticket by ID or QR code
+        // Lookup ticket by ID or session token
         let query = supabase.from('tickets').select(`
             *,
             sessions (
@@ -47,8 +47,17 @@ export async function PATCH(
             )
         `);
 
-        if (qrCode) {
-            query = query.eq('qr_code', qrCode);
+        if (sessionToken) {
+            // Find session first, then get ticket
+            const { data: session } = await supabase
+                .from('sessions')
+                .select('id')
+                .eq('session_token', sessionToken)
+                .single();
+
+            if (session) {
+                query = query.eq('session_id', session.id);
+            }
         } else {
             query = query.eq('id', ticketId);
         }
@@ -78,8 +87,8 @@ export async function PATCH(
         if (ticket.entry_redeemed) {
             console.error('❌ Ticket already redeemed for entry at:', ticket.entry_redeemed_at);
             return NextResponse.json(
-                { 
-                    error: 'Ticket already used for entry', 
+                {
+                    error: 'Ticket already used for entry',
                     ticket,
                     redeemedAt: ticket.entry_redeemed_at,
                     redeemedBy: ticket.entry_redeemed_by
@@ -116,9 +125,9 @@ export async function PATCH(
         }
 
         console.log('✅ Ticket redeemed for entry:', updatedTicket.id, 'at:', updatedTicket.entry_redeemed_at);
-        return NextResponse.json({ 
+        return NextResponse.json({
             ticket: updatedTicket,
-            message: 'Ticket successfully redeemed for entry' 
+            message: 'Ticket successfully redeemed for entry'
         }, { status: 200 });
 
     } catch (err: any) {

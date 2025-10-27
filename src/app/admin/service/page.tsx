@@ -11,7 +11,7 @@ export default function ServiceControlPage() {
 
     useEffect(() => {
         fetchServiceStatus();
-        
+
         // Poll every 10 seconds
         const interval = setInterval(fetchServiceStatus, 10000);
         return () => clearInterval(interval);
@@ -169,7 +169,7 @@ export default function ServiceControlPage() {
                                         <li>Staff shortage</li>
                                         <li>Emergency situations</li>
                                     </ul>
-                                    
+
                                     <p className="mb-2"><strong className="text-success">Open Service:</strong></p>
                                     <ul className="mb-0" style={{ paddingLeft: '20px' }}>
                                         <li>Start of service hours</li>

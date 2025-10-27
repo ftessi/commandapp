@@ -8,13 +8,13 @@ import QRCode from 'qrcode';
 export const generateSessionQR = async (sessionToken: string): Promise<string> => {
     try {
         // Get the base URL (use environment variable in production)
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                       (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-        
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+            (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+
         const qrUrl = `${baseUrl}/qr/${sessionToken}`;
-        
+
         console.log('🎨 Generating QR code for URL:', qrUrl);
-        
+
         // Generate QR code as data URL
         const qrDataUrl = await QRCode.toDataURL(qrUrl, {
             errorCorrectionLevel: 'M',
@@ -25,7 +25,7 @@ export const generateSessionQR = async (sessionToken: string): Promise<string> =
                 light: '#FFFFFF'
             }
         });
-        
+
         console.log('✅ QR code generated successfully');
         return qrDataUrl;
     } catch (error) {
@@ -41,15 +41,15 @@ export const generateSessionQRBuffer = async (sessionToken: string): Promise<Buf
     try {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const qrUrl = `${baseUrl}/qr/${sessionToken}`;
-        
+
         console.log('🎨 Generating QR code buffer for URL:', qrUrl);
-        
+
         const qrBuffer = await QRCode.toBuffer(qrUrl, {
             errorCorrectionLevel: 'M',
             margin: 1,
             width: 400
         });
-        
+
         console.log('✅ QR code buffer generated successfully');
         return qrBuffer;
     } catch (error) {
@@ -62,7 +62,7 @@ export const generateSessionQRBuffer = async (sessionToken: string): Promise<Buf
  * Get the QR URL for a session token (without generating the image)
  */
 export const getSessionQRUrl = (sessionToken: string): string => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
     return `${baseUrl}/qr/${sessionToken}`;
 };

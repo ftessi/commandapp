@@ -137,7 +137,7 @@ export const getCurrentSession = async (): Promise<Session | null> => {
     try {
         const response = await fetch(`/api/sessions?token=${token}`);
         if (!response.ok) return null;
-        
+
         const data = await response.json();
         return data.session;
     } catch (error) {
@@ -152,16 +152,16 @@ export const getCurrentSession = async (): Promise<Session | null> => {
 export const restoreSessionFromToken = async (token: string): Promise<Session | null> => {
     try {
         console.log('🔄 [SessionService] Restoring session from token...');
-        
+
         const response = await fetch(`/api/sessions?token=${token}`);
         if (!response.ok) return null;
-        
+
         const data = await response.json();
-        
+
         // Store token locally
         storeSessionToken(token);
         console.log('✅ [SessionService] Session restored:', data.session.id);
-        
+
         return data.session;
     } catch (error) {
         console.error('❌ [SessionService] Error restoring session:', error);

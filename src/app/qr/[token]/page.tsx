@@ -12,7 +12,7 @@ export default function QRScanPage({ params }: { params: { token: string } }) {
     useEffect(() => {
         const restoreSession = async () => {
             const token = params.token;
-            
+
             if (!token) {
                 setError('No session token provided');
                 setLoading(false);
@@ -20,18 +20,18 @@ export default function QRScanPage({ params }: { params: { token: string } }) {
             }
 
             console.log('📱 Restoring session from QR scan:', token);
-            
+
             try {
                 // Validate token exists in database
                 const response = await fetch(`/api/sessions?token=${token}`);
-                
+
                 if (response.ok) {
                     const data = await response.json();
-                    
+
                     // Store token in localStorage
                     storeSessionToken(token);
                     console.log('✅ Session restored from QR code');
-                    
+
                     // Redirect to tickets page to see their ticket
                     setTimeout(() => {
                         router.push('/tickets');

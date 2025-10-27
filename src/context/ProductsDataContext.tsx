@@ -50,7 +50,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         };
 
         fetchServiceStatus();
-        
+
         // Poll service status every 30 seconds
         const interval = setInterval(fetchServiceStatus, 30000);
         return () => clearInterval(interval);
@@ -58,43 +58,23 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
 
     // Load persisted state from local storage on component mount
     useEffect(() => {
-        console.log('📦 [ProductsDataContext] Loading persisted cart quantities from localStorage...');
+        console.log('📦 [ProductsDataContext] Loading persisted cart from localStorage...');
 
         const storedCart = localStorage.getItem('commandapp_cart');
-        const storedCurrentOrders = localStorage.getItem('commandapp_current_orders');
-        const storedPastOrders = localStorage.getItem('commandapp_past_orders');
 
-        // Don't load products from localStorage here - let API fetch handle that
-        // We only restore cart quantities later when merging with API data
+        // Only restore cart quantities - orders will be fetched from API
         if (storedCart) {
             console.log('🛒 [ProductsDataContext] Found stored cart (will merge with API products later)');
         } else {
             console.log('🛒 [ProductsDataContext] No stored cart found');
         }
 
-        if (storedCurrentOrders) {
-            try {
-                const parsed = JSON.parse(storedCurrentOrders);
-                console.log('📋 [ProductsDataContext] Found stored current orders:', parsed.length, 'orders');
-                setCurrentOrders(parsed);
-            } catch (error) {
-                console.error('❌ [ProductsDataContext] Error parsing current orders:', error);
-            }
-        } else {
-            console.log('📋 [ProductsDataContext] No stored current orders found');
-        }
+        // Clean up any old order data from localStorage (migration from old version)
+        localStorage.removeItem('commandapp_current_orders');
+        localStorage.removeItem('commandapp_past_orders');
 
-        if (storedPastOrders) {
-            try {
-                const parsed = JSON.parse(storedPastOrders);
-                console.log('📜 [ProductsDataContext] Found stored past orders:', parsed.length, 'orders');
-                setPastOrders(parsed);
-            } catch (error) {
-                console.error('❌ [ProductsDataContext] Error parsing past orders:', error);
-            }
-        } else {
-            console.log('📜 [ProductsDataContext] No stored past orders found');
-        }
+        // Don't load orders from localStorage - always fetch from server
+        console.log('📋 [ProductsDataContext] Orders will be fetched from API only (not localStorage)');
     }, []);
 
     // Load products from API or test data
@@ -205,14 +185,14 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
                 // Get session token to fetch user-specific orders
                 const sessionToken = getStoredSessionToken();
                 let url = '/api/orders';
-                
+
                 if (sessionToken) {
                     url += `?sessionToken=${sessionToken}`;
                     console.log('🔐 [ProductsDataContext] Fetching orders for session');
                 } else {
                     console.log('ℹ️ [ProductsDataContext] No session token, fetching all orders (dev mode)');
                 }
-                
+
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to fetch orders from API');
@@ -249,25 +229,9 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
                     console.log('✅ [ProductsDataContext] Current orders from API:', current.length);
                     console.log('✅ [ProductsDataContext] Past orders from API:', past.length);
 
-                    // Merge with localStorage orders (API takes precedence)
-                    setCurrentOrders(prevOrders => {
-                        // Keep local orders that aren't in API response
-                        const localOnly = prevOrders.filter(local =>
-                            !current.some(api => api.orderId === local.orderId)
-                        );
-                        const merged = [...current, ...localOnly];
-                        console.log('🔄 [ProductsDataContext] Merged current orders:', merged.length);
-                        return merged;
-                    });
-
-                    setPastOrders(prevOrders => {
-                        const localOnly = prevOrders.filter(local =>
-                            !past.some(api => api.orderId === local.orderId)
-                        );
-                        const merged = [...past, ...localOnly];
-                        console.log('🔄 [ProductsDataContext] Merged past orders:', merged.length);
-                        return merged;
-                    });
+                    // Set orders directly from API (no localStorage merging for orders)
+                    setCurrentOrders(current);
+                    setPastOrders(past);
                 }
             } catch (error) {
                 console.error('❌ [ProductsDataContext] Error fetching orders from API:', error);
@@ -350,20 +314,8 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         };
     }, [isListening]); // Only re-run if isListening changes
 
-    // Persist current orders and past orders when they change
-    useEffect(() => {
-        if (currentOrders.length > 0) {
-            localStorage.setItem('commandapp_current_orders', JSON.stringify(currentOrders));
-        } else {
-            localStorage.removeItem('commandapp_current_orders');
-        }
-    }, [currentOrders]);
-
-    useEffect(() => {
-        if (pastOrders.length > 0) {
-            localStorage.setItem('commandapp_past_orders', JSON.stringify(pastOrders));
-        }
-    }, [pastOrders]);
+    // NOTE: Orders are NOT persisted to localStorage - always fetch from server
+    // Only the cart (before checkout) is persisted to localStorage
 
     const addToCart = (productId: number, quantity: number) => {
         console.log(`➕ [ProductsDataContext] Adding to cart: Product #${productId}, quantity: ${quantity}`);
@@ -422,7 +374,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         }
 
         const timestamp = new Date().toISOString();
-        
+
         // Get session token
         const sessionToken = getStoredSessionToken();
 

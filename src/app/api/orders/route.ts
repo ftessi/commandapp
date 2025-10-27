@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         .select('id')
         .eq('session_token', sessionToken)
         .single();
-      
+
       if (session) {
         sessionId = session.id;
         console.log('✅ Found existing session:', sessionId);
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
         .select('id')
         .eq('session_token', sessionToken)
         .single();
-      
+
       if (session) {
         query = query.eq('session_id', session.id);
         console.log('✅ Filtering orders for session:', session.id);

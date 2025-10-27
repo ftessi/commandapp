@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest) {
 
         const { data, error } = await supabase
             .from('service_status')
-            .update({ 
+            .update({
                 is_open,
                 updated_at: new Date().toISOString()
             })
