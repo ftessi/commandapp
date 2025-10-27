@@ -1,6 +1,6 @@
-# Commandapp - Next.js Restaurant Ordering System
+# Commandapp - Ticketing and order service
 
-A modern restaurant ordering system built with Next.js 14, TypeScript, and Supabase.
+A modern venue ticket/ordering system built.
 
 ## 🚀 Features
 
