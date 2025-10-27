@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/services/supabaseClient';
 
 export default function ServiceControlPage() {
     const [isServiceOpen, setIsServiceOpen] = useState(true);
@@ -11,10 +12,37 @@ export default function ServiceControlPage() {
 
     useEffect(() => {
         fetchServiceStatus();
+    }, []);
 
-        // Poll every 10 seconds
-        const interval = setInterval(fetchServiceStatus, 10000);
-        return () => clearInterval(interval);
+    // Supabase Realtime subscription for service status
+    useEffect(() => {
+        console.log('🔴 [ServiceControl] Setting up Realtime subscription for service status...');
+        
+        const serviceChannel = supabase
+            .channel('service-status-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'service_status'
+                },
+                (payload: any) => {
+                    console.log('🔔 [ServiceControl] Realtime service status change:', payload.eventType);
+                    fetchServiceStatus();
+                }
+            )
+            .subscribe((status) => {
+                console.log('🔴 [ServiceControl] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [ServiceControl] Successfully subscribed to service status realtime updates');
+                }
+            });
+
+        return () => {
+            console.log('🛑 [ServiceControl] Cleaning up Realtime subscription');
+            supabase.removeChannel(serviceChannel);
+        };
     }, []);
 
     const fetchServiceStatus = async () => {

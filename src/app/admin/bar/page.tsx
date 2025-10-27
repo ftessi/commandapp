@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/services/supabaseClient';
 
 interface Order {
     order_id: string;
@@ -32,11 +33,39 @@ export default function BarAdminPage() {
         }
 
         fetchOrders();
-
-        // Auto-refresh every 10 seconds
-        const interval = setInterval(fetchOrders, 10000);
-        return () => clearInterval(interval);
     }, [router]);
+
+    // Supabase Realtime subscription for orders
+    useEffect(() => {
+        console.log('🔴 [BarAdmin] Setting up Realtime subscription for orders...');
+        
+        const ordersChannel = supabase
+            .channel('bar-orders-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders'
+                },
+                (payload: any) => {
+                    console.log('🔔 [BarAdmin] Realtime order change:', payload.eventType);
+                    // Refresh orders when any change occurs
+                    fetchOrders();
+                }
+            )
+            .subscribe((status) => {
+                console.log('🔴 [BarAdmin] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [BarAdmin] Successfully subscribed to orders realtime updates');
+                }
+            });
+
+        return () => {
+            console.log('🛑 [BarAdmin] Cleaning up Realtime subscription');
+            supabase.removeChannel(ordersChannel);
+        };
+    }, []);
 
     const fetchOrders = async () => {
         try {

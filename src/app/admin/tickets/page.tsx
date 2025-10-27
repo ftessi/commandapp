@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Html5Qrcode } from 'html5-qrcode';
+import { supabase } from '@/services/supabaseClient';
 
 interface Ticket {
     id: string;
@@ -63,10 +64,51 @@ export default function TicketsAdminPage() {
         };
     }, []);
 
+    // Supabase Realtime subscription for tickets
+    useEffect(() => {
+        console.log('🔴 [TicketsAdmin] Setting up Realtime subscription for tickets...');
+        
+        const ticketsChannel = supabase
+            .channel('tickets-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to INSERT, UPDATE, DELETE
+                    schema: 'public',
+                    table: 'tickets'
+                },
+                (payload: any) => {
+                    console.log('🔔 [TicketsAdmin] Realtime ticket change:', payload.eventType, payload.new?.id);
+                    // Refresh tickets when any change occurs
+                    fetchTickets();
+                }
+            )
+            .subscribe((status) => {
+                console.log('🔴 [TicketsAdmin] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [TicketsAdmin] Successfully subscribed to tickets realtime updates');
+                }
+            });
+
+        return () => {
+            console.log('🛑 [TicketsAdmin] Cleaning up Realtime subscription');
+            supabase.removeChannel(ticketsChannel);
+        };
+    }, []); // Only run once on mount
+
     const fetchTickets = async () => {
         console.log('📋 Fetching tickets...');
+        setLoading(true);
         try {
-            const res = await fetch('/api/tickets?limit=200');
+            // Add timestamp to prevent caching
+            const timestamp = new Date().getTime();
+            const res = await fetch(`/api/tickets?limit=200&_t=${timestamp}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
             const data = await res.json();
 
             if (data.tickets) {
@@ -350,9 +392,28 @@ export default function TicketsAdminPage() {
                 {/* Header */}
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h2 className="text-white">🎫 Tickets Admin Dashboard</h2>
-                    <button className="btn btn-outline-light" onClick={handleLogout}>
-                        Logout
-                    </button>
+                    <div className="d-flex gap-2">
+                        <button 
+                            className="btn btn-outline-warning" 
+                            onClick={() => fetchTickets()}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="spinner-border spinner-border-sm me-2"></span>
+                                    Refreshing...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="bi bi-arrow-clockwise me-2"></i>
+                                    Refresh
+                                </>
+                            )}
+                        </button>
+                        <button className="btn btn-outline-light" onClick={handleLogout}>
+                            Logout
+                        </button>
+                    </div>
                 </div>
 
                 {/* QR Scanner Card */}

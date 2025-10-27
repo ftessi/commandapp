@@ -216,7 +216,16 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`✅ Found ${data?.length || 0} tickets`);
-        return NextResponse.json({ tickets: data || [] }, { status: 200 });
+        
+        // Disable caching - always fetch fresh data
+        return NextResponse.json({ tickets: data || [] }, { 
+            status: 200,
+            headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
 
     } catch (err: any) {
         console.error('❌ Unexpected error in GET /api/tickets:', err);

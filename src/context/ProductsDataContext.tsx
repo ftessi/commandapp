@@ -5,6 +5,7 @@ import { Product, ProductContextType, Order, OrderStatus } from '../types/types'
 import ProductsTestData from '../assets/Products.json';
 import { v4 as uuidv4 } from 'uuid';
 import { getStoredSessionToken } from '../services/sessionService';
+import { supabase } from '../services/supabaseClient';
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
@@ -50,10 +51,38 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         };
 
         fetchServiceStatus();
+    }, []);
 
-        // Poll service status every 30 seconds
-        const interval = setInterval(fetchServiceStatus, 30000);
-        return () => clearInterval(interval);
+    // Supabase Realtime subscription for service status
+    useEffect(() => {
+        console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for service status...');
+        
+        const serviceChannel = supabase
+            .channel('products-service-status')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'service_status',
+                    filter: 'service_name=eq.ordering'
+                },
+                (payload: any) => {
+                    console.log('🔔 [ProductsDataContext] Realtime service status change:', payload.new?.is_open);
+                    if (payload.new) {
+                        setIsServiceOpen(payload.new.is_open);
+                    }
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [ProductsDataContext] Subscribed to service status realtime updates');
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(serviceChannel);
+        };
     }, []);
 
     // Load persisted state from local storage on component mount
@@ -245,72 +274,98 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
     }, []);
 
     // Listen to server for order updates (admin polling)
+    // REPLACED WITH REALTIME - See useEffect below with supabase.channel()
+    // Keeping this for reference but it's now inactive
     useEffect(() => {
         // Start polling only if we have orders and aren't already listening
         if (currentOrders.length > 0 && !isListening) {
             setIsListening(true);
-            console.log(`🔄 [ProductsDataContext] Starting order polling for ${currentOrders.length} active orders...`);
+            console.log(`🔄 [ProductsDataContext] Starting realtime subscription for ${currentOrders.length} active orders...`);
         }
 
         // Stop polling if no more orders
         if (currentOrders.length === 0 && isListening) {
             setIsListening(false);
-            console.log('🛑 [ProductsDataContext] No active orders, stopping polling');
+            console.log('🛑 [ProductsDataContext] No active orders, stopping realtime');
         }
     }, [currentOrders.length]); // Only depend on the LENGTH, not the array itself
 
-    // Separate effect for the actual polling interval
+    // Separate effect for the actual realtime subscription
     useEffect(() => {
         if (!isListening) return;
 
-        console.log('🎯 [ProductsDataContext] Polling interval started');
-
-        // Poll for order status updates
-        const checkOrderStatus = async () => {
-            const orders = currentOrdersRef.current;
-            if (orders.length === 0) return;
-
-            console.log(`🔍 [ProductsDataContext] Polling for order status updates... (${orders.length} orders)`);
-
-            try {
-                const response = await fetch('/api/orders');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch orders');
-                }
-
-                const data = await response.json();
-                if (data.orders && Array.isArray(data.orders)) {
-                    console.log(`✅ [ProductsDataContext] Polled ${data.orders.length} orders from server`);
-
-                    // Check for status changes
-                    let changesDetected = false;
-                    orders.forEach(localOrder => {
-                        const serverOrder = data.orders.find((o: any) => o.order_id === localOrder.orderId);
-                        if (serverOrder && serverOrder.status !== localOrder.status) {
-                            console.log(`🔔 [ProductsDataContext] Order ${localOrder.orderId} status changed: ${localOrder.status} → ${serverOrder.status}`);
-                            updateOrderStatus(localOrder.orderId, serverOrder.status);
-                            changesDetected = true;
+        console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for orders...');
+        
+        // Get session token to filter only user's orders  
+        const sessionToken = getStoredSessionToken();
+        
+        // Subscribe to orders table changes
+        const ordersChannel = supabase
+            .channel('orders-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'orders'
+                },
+                async (payload: any) => {
+                    console.log('� [ProductsDataContext] Realtime order change:', payload.eventType, payload.new?.order_id);
+                    
+                    // Re-fetch orders to get fresh data with full details
+                    try {
+                        let url = `/api/orders?_t=${Date.now()}`;
+                        if (sessionToken) {
+                            url += `&sessionToken=${sessionToken}`;
                         }
-                    });
+                        
+                        const response = await fetch(url, { cache: 'no-store' });
+                        const data = await response.json();
+                        
+                        if (data.orders && Array.isArray(data.orders)) {
+                            const apiOrders: Order[] = data.orders.map((order: any) => ({
+                                orderId: order.order_id,
+                                ticketNumber: order.ticket_number || 'N/A',
+                                items: order.order_items?.map((item: any) => ({
+                                    productId: item.product_id,
+                                    name: item.name,
+                                    price: Number(item.price),
+                                    quantity: item.quantity
+                                })) || [],
+                                timestamp: order.created_at,
+                                total: Number(order.total),
+                                status: order.status
+                            }));
 
-                    if (!changesDetected) {
-                        console.log('ℹ️  [ProductsDataContext] No status changes detected');
+                            const current = apiOrders.filter(o =>
+                                o.status === OrderStatus.PENDING ||
+                                o.status === OrderStatus.PAID ||
+                                o.status === OrderStatus.PREPARING
+                            );
+                            const past = apiOrders.filter(o =>
+                                o.status === OrderStatus.COMPLETED
+                            );
+
+                            setCurrentOrders(current);
+                            setPastOrders(past);
+                            
+                            console.log('✅ [ProductsDataContext] Orders updated from realtime event');
+                        }
+                    } catch (error) {
+                        console.error('❌ [ProductsDataContext] Error fetching updated orders:', error);
                     }
                 }
-            } catch (error) {
-                console.error('❌ [ProductsDataContext] Error polling orders:', error);
-            }
-        };
-
-        // Check immediately on start
-        checkOrderStatus();
-
-        // Then check every 30 seconds
-        const intervalId = setInterval(checkOrderStatus, 30000);
+            )
+            .subscribe((status) => {
+                console.log('🔴 [ProductsDataContext] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [ProductsDataContext] Successfully subscribed to orders realtime updates');
+                }
+            });
 
         return () => {
-            console.log('🛑 [ProductsDataContext] Polling interval stopped');
-            clearInterval(intervalId);
+            console.log('🛑 [ProductsDataContext] Cleaning up Realtime subscription');
+            supabase.removeChannel(ordersChannel);
         };
     }, [isListening]); // Only re-run if isListening changes
 

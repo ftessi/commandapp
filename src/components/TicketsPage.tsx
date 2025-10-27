@@ -60,7 +60,14 @@ export default function TicketsPage() {
         setLoading(false);
     }, []);    const loadMyTicket = async (sessionToken: string) => {
         try {
-            const res = await fetch(`/api/tickets?sessionToken=${sessionToken}`);
+            // Add timestamp to prevent caching
+            const timestamp = new Date().getTime();
+            const res = await fetch(`/api/tickets?sessionToken=${sessionToken}&_t=${timestamp}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
             const data = await res.json();
 
             if (data.tickets && data.tickets.length > 0) {
