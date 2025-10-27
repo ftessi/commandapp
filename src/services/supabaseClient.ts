@@ -15,4 +15,15 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn('Supabase: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is not set in environment');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Create Supabase client with realtime configuration
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});

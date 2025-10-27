@@ -77,6 +77,10 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     console.log('✅ [ProductsDataContext] Subscribed to service status realtime updates');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [ProductsDataContext] Service status subscription error');
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⏱️ [ProductsDataContext] Service status subscription timed out');
                 }
             });
 
@@ -120,6 +124,10 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     console.log('✅ [ProductsDataContext] Subscribed to products and categories realtime updates');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [ProductsDataContext] Products/categories subscription error');
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⏱️ [ProductsDataContext] Products/categories subscription timed out');
                 }
             });
 
@@ -398,10 +406,16 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
                     }
                 }
             )
-            .subscribe((status) => {
+            .subscribe((status, err) => {
                 console.log('🔴 [ProductsDataContext] Realtime subscription status:', status);
                 if (status === 'SUBSCRIBED') {
                     console.log('✅ [ProductsDataContext] Successfully subscribed to orders realtime updates');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [ProductsDataContext] Realtime subscription error:', err);
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⏱️ [ProductsDataContext] Realtime subscription timed out');
+                } else if (status === 'CLOSED') {
+                    console.warn('🔌 [ProductsDataContext] Realtime subscription closed');
                 }
             });
 
