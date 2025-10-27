@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Order, OrderStatus } from '@/types/types';
+import { supabase } from '@/services/supabaseClient';
 
 // API response type (snake_case from database)
 interface ApiOrder {
@@ -36,6 +37,36 @@ export default function PaymentAdminPage() {
 
         fetchOrders();
     }, [router]);
+
+    // Realtime subscription for orders
+    useEffect(() => {
+        const ordersChannel = supabase
+            .channel('payment-orders-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders'
+                },
+                (payload: any) => {
+                    console.log('🔔 [PaymentAdmin] Realtime order change:', payload.eventType);
+                    // Refresh orders when any change occurs
+                    fetchOrders();
+                }
+            )
+            .subscribe((status) => {
+                console.log('🔴 [PaymentAdmin] Realtime subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [PaymentAdmin] Successfully subscribed to orders realtime updates');
+                }
+            });
+
+        return () => {
+            console.log('🛑 [PaymentAdmin] Cleaning up Realtime subscription');
+            supabase.removeChannel(ordersChannel);
+        };
+    }, []);
 
     const fetchOrders = async () => {
         console.log('📋 Fetching pending orders...');
@@ -142,23 +173,14 @@ export default function PaymentAdminPage() {
                 {/* Search Card */}
                 <div className="card mb-4" style={{ backgroundColor: '#3a3f47', border: 'none' }}>
                     <div className="card-body">
-                        <div className="row g-3">
-                            <div className="col-md-6">
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    style={{ backgroundColor: '#282c34', color: 'white', border: '1px solid #495057' }}
-                                    placeholder="Search by ticket number..."
-                                    value={searchTerm}
-                                    onChange={(e) => handleSearch(e.target.value)}
-                                />
-                            </div>
-                            <div className="col-md-6 text-end">
-                                <button className="btn btn-light" onClick={fetchOrders}>
-                                    <i className="bi bi-arrow-clockwise"></i> Refresh
-                                </button>
-                            </div>
-                        </div>
+                        <input
+                            type="text"
+                            className="form-control"
+                            style={{ backgroundColor: '#282c34', color: 'white', border: '1px solid #495057' }}
+                            placeholder="Search by ticket number..."
+                            value={searchTerm}
+                            onChange={(e) => handleSearch(e.target.value)}
+                        />
                     </div>
                 </div>
 

@@ -13,6 +13,12 @@ ALTER publication supabase_realtime ADD TABLE service_status;
 -- Enable realtime for ticket_types table
 ALTER publication supabase_realtime ADD TABLE ticket_types;
 
+-- Enable realtime for products table
+ALTER publication supabase_realtime ADD TABLE products;
+
+-- Enable realtime for categories table
+ALTER publication supabase_realtime ADD TABLE categories;
+
 -- Verify realtime is enabled
 -- You can check in Supabase Dashboard > Database > Replication
 -- Or query: SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime';
@@ -21,3 +27,5 @@ COMMENT ON TABLE orders IS 'Orders table with realtime updates enabled';
 COMMENT ON TABLE tickets IS 'Tickets table with realtime updates enabled';
 COMMENT ON TABLE service_status IS 'Service status table with realtime updates enabled';
 COMMENT ON TABLE ticket_types IS 'Ticket types table with realtime updates enabled';
+COMMENT ON TABLE products IS 'Products table with realtime updates enabled';
+COMMENT ON TABLE categories IS 'Categories table with realtime updates enabled';

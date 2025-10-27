@@ -10,15 +10,6 @@ const OrderHistory: React.FC = () => {
         return new Date(timestamp).toLocaleString();
     };
 
-    const clearAllLocalStorage = () => {
-        if (confirm('Are you sure you want to clear all local data? This will remove your cart and order history.')) {
-            localStorage.removeItem('commandapp_cart');
-            localStorage.removeItem('commandapp_current_orders');
-            localStorage.removeItem('commandapp_past_orders');
-            window.location.reload();
-        }
-    };
-
     const getStatusBadgeClass = (status: OrderStatus): string => {
         switch (status) {
             case OrderStatus.PENDING:
@@ -89,15 +80,8 @@ const OrderHistory: React.FC = () => {
         <div className="dark-page">
             <div className="container py-5">
                 {/* Header */}
-                <div className="d-flex justify-content-between align-items-center mb-5">
+                <div className="mb-5">
                     <h1 className="display-4">📋 My Orders</h1>
-                    <button
-                        onClick={clearAllLocalStorage}
-                        className="btn btn-outline-danger btn-sm"
-                        title="Clear local storage"
-                    >
-                        <i className="bi bi-trash"></i> Clear Data
-                    </button>
                 </div>
 
                 {currentOrders.length > 0 && (

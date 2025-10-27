@@ -85,6 +85,49 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         };
     }, []);
 
+    // Supabase Realtime subscription for products and categories
+    useEffect(() => {
+        console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for products and categories...');
+        
+        const productsChannel = supabase
+            .channel('products-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'products'
+                },
+                (payload: any) => {
+                    console.log('🔔 [ProductsDataContext] Realtime products change:', payload.eventType);
+                    // Refetch products when they change
+                    fetchProductsFromAPI();
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'categories'
+                },
+                (payload: any) => {
+                    console.log('🔔 [ProductsDataContext] Realtime categories change:', payload.eventType);
+                    // Refetch products when categories change
+                    fetchProductsFromAPI();
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [ProductsDataContext] Subscribed to products and categories realtime updates');
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(productsChannel);
+        };
+    }, []);
+
     // Load persisted state from local storage on component mount
     useEffect(() => {
         console.log('📦 [ProductsDataContext] Loading persisted cart from localStorage...');
@@ -106,82 +149,81 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         console.log('📋 [ProductsDataContext] Orders will be fetched from API only (not localStorage)');
     }, []);
 
+    // Fetch products from the backend API
+    const fetchProductsFromAPI = async () => {
+        try {
+            const response = await fetch('/api/products');
+            if (!response.ok) {
+                throw new Error('Failed to fetch products from API');
+            }
+            const data = await response.json();
+            console.log('✅ [ProductsDataContext] API response received:', data);
+
+            // API returns grouped by category: { "Primi": [...], "Secondi": [...] }
+            // Flatten to array of products while preserving category
+            const flatProducts: Product[] = Object.entries(data)
+                .flatMap(([category, products]: [string, any]) =>
+                    products.map((product: any) => ({
+                        ...product,
+                        category, // Preserve category name
+                        quantityInCart: 0
+                    }))
+                );
+
+            console.log('✅ [ProductsDataContext] Flattened products from API:', flatProducts.length, 'products');
+            console.log('✅ [ProductsDataContext] First product from API:', flatProducts[0]?.name, 'in category:', (flatProducts[0] as any)?.category);
+
+            // Preserve cart quantities from localStorage
+            const storedCart = localStorage.getItem('commandapp_cart');
+            if (storedCart) {
+                try {
+                    const parsedCart = JSON.parse(storedCart);
+                    console.log('🔄 [ProductsDataContext] Merging API products with stored cart quantities...');
+                    const merged = flatProducts.map(product => {
+                        // Find stored product by ID
+                        const storedProduct = parsedCart.find((p: Product) => p.id === product.id);
+                        if (storedProduct && storedProduct.quantityInCart > 0) {
+                            console.log(`  - Product ${product.name}: restored quantity ${storedProduct.quantityInCart}`);
+                            // IMPORTANT: Use API product data, only restore the quantity
+                            return { ...product, quantityInCart: storedProduct.quantityInCart };
+                        }
+                        return product;
+                    });
+                    setProducts(merged);
+                    console.log('✅ [ProductsDataContext] Set products with merged cart quantities');
+                    console.log('✅ [ProductsDataContext] Products in state:', merged.map(p => ({ id: p.id, name: p.name, qty: p.quantityInCart })));
+                } catch (error) {
+                    console.error('❌ [ProductsDataContext] Error merging cart:', error);
+                    setProducts(flatProducts);
+                }
+            } else {
+                setProducts(flatProducts);
+                console.log('✅ [ProductsDataContext] Set products from API (no cart to merge)');
+            }
+        } catch (error) {
+            console.error('❌ [ProductsDataContext] Error fetching products from API:', error);
+            // Use test data as fallback
+            const flatProducts: Product[] = Object.values(ProductsTestData)
+                .flat()
+                .map(product => ({ ...product, quantityInCart: 0 }));
+
+            console.log('⚠️  [ProductsDataContext] Falling back to local ProductsTestData:', flatProducts.length, 'products');
+            console.log('⚠️  [ProductsDataContext] First product from fallback:', flatProducts[0]?.name);
+
+            setProducts(prevProducts => {
+                if (prevProducts.length > 0) {
+                    console.log('⚠️  [ProductsDataContext] Products already loaded, skipping fallback');
+                    return prevProducts;
+                }
+                return flatProducts;
+            });
+        }
+    };
+
     // Load products from API or test data
     useEffect(() => {
         console.log('🌐 [ProductsDataContext] Fetching products from API...');
-
-        // Fetch products from the backend
-        const fetchProducts = async () => {
-            try {
-                const response = await fetch('/api/products');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch products from API');
-                }
-                const data = await response.json();
-                console.log('✅ [ProductsDataContext] API response received:', data);
-
-                // API returns grouped by category: { "Primi": [...], "Secondi": [...] }
-                // Flatten to array of products while preserving category
-                const flatProducts: Product[] = Object.entries(data)
-                    .flatMap(([category, products]: [string, any]) =>
-                        products.map((product: any) => ({
-                            ...product,
-                            category, // Preserve category name
-                            quantityInCart: 0
-                        }))
-                    );
-
-                console.log('✅ [ProductsDataContext] Flattened products from API:', flatProducts.length, 'products');
-                console.log('✅ [ProductsDataContext] First product from API:', flatProducts[0]?.name, 'in category:', (flatProducts[0] as any)?.category);
-
-                // Preserve cart quantities from localStorage
-                const storedCart = localStorage.getItem('commandapp_cart');
-                if (storedCart) {
-                    try {
-                        const parsedCart = JSON.parse(storedCart);
-                        console.log('🔄 [ProductsDataContext] Merging API products with stored cart quantities...');
-                        const merged = flatProducts.map(product => {
-                            // Find stored product by ID
-                            const storedProduct = parsedCart.find((p: Product) => p.id === product.id);
-                            if (storedProduct && storedProduct.quantityInCart > 0) {
-                                console.log(`  - Product ${product.name}: restored quantity ${storedProduct.quantityInCart}`);
-                                // IMPORTANT: Use API product data, only restore the quantity
-                                return { ...product, quantityInCart: storedProduct.quantityInCart };
-                            }
-                            return product;
-                        });
-                        setProducts(merged);
-                        console.log('✅ [ProductsDataContext] Set products with merged cart quantities');
-                        console.log('✅ [ProductsDataContext] Products in state:', merged.map(p => ({ id: p.id, name: p.name, qty: p.quantityInCart })));
-                    } catch (error) {
-                        console.error('❌ [ProductsDataContext] Error merging cart:', error);
-                        setProducts(flatProducts);
-                    }
-                } else {
-                    setProducts(flatProducts);
-                    console.log('✅ [ProductsDataContext] Set products from API (no cart to merge)');
-                }
-            } catch (error) {
-                console.error('❌ [ProductsDataContext] Error fetching products from API:', error);
-                // Use test data as fallback
-                const flatProducts: Product[] = Object.values(ProductsTestData)
-                    .flat()
-                    .map(product => ({ ...product, quantityInCart: 0 }));
-
-                console.log('⚠️  [ProductsDataContext] Falling back to local ProductsTestData:', flatProducts.length, 'products');
-                console.log('⚠️  [ProductsDataContext] First product from fallback:', flatProducts[0]?.name);
-
-                setProducts(prevProducts => {
-                    if (prevProducts.length > 0) {
-                        console.log('⚠️  [ProductsDataContext] Products already loaded, skipping fallback');
-                        return prevProducts;
-                    }
-                    return flatProducts;
-                });
-            }
-        };
-
-        fetchProducts();
+        fetchProductsFromAPI();
     }, []);
 
     // Update cart total whenever products change
