@@ -34,6 +34,8 @@ export default function TicketsAdminPage() {
     const [updating, setUpdating] = useState<string | null>(null);
     const [qrInput, setQrInput] = useState('');
     const [showScanner, setShowScanner] = useState(false);
+    const [scannedTicket, setScannedTicket] = useState<Ticket | null>(null);
+    const [showTicketModal, setShowTicketModal] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const router = useRouter();
 
@@ -111,9 +113,33 @@ export default function TicketsAdminPage() {
 
     const startScanner = async () => {
         try {
+            console.log('📷 Starting QR scanner...');
+            
+            // Check if we're on HTTPS (required for camera on iOS Safari)
+            if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                alert('⚠️ Camera requires HTTPS connection.\n\nPlease access this page via https:// instead of http://');
+                return;
+            }
+            
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('❌ Camera API not supported in this browser.\n\nPlease use Safari, Chrome, or another modern browser.');
+                return;
+            }
+            
+            console.log('📷 Browser supports camera API');
+            
+            // Show scanner div first
+            setShowScanner(true);
+            
+            // Wait for DOM to update
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            console.log('📷 Initializing Html5Qrcode...');
             const html5QrCode = new Html5Qrcode("qr-reader");
             scannerRef.current = html5QrCode;
 
+            console.log('📷 Requesting camera access...');
             await html5QrCode.start(
                 { facingMode: "environment" },
                 {
@@ -121,26 +147,55 @@ export default function TicketsAdminPage() {
                     qrbox: { width: 250, height: 250 }
                 },
                 (decodedText) => {
-                    console.log('QR Code scanned:', decodedText);
+                    console.log('✅ QR Code scanned:', decodedText);
                     // Extract session token from URL
                     const match = decodedText.match(/\/qr\/([a-f0-9-]+)/i);
-                    if (match) {
-                        setQrInput(match[1]);
-                        stopScanner();
-                    } else {
-                        setQrInput(decodedText);
-                        stopScanner();
-                    }
+                    const sessionToken = match ? match[1] : decodedText;
+                    
+                    // Fetch ticket by session token and show modal
+                    fetchTicketBySessionToken(sessionToken);
+                    stopScanner();
                 },
                 (errorMessage) => {
                     // Ignore scan errors, they happen frequently
                 }
             );
+            
+            console.log('✅ Camera started successfully');
+        } catch (error: any) {
+            console.error('❌ Error starting scanner:', error);
+            console.error('❌ Error details:', error.message, error.name);
+            setShowScanner(false);
+            
+            // Better error message for iPhone/Safari
+            if (error.name === 'NotAllowedError') {
+                alert('❌ Camera access denied.\n\nFor iPhone:\n1. Go to Settings > Safari > Camera\n2. Select "Ask" or "Allow"\n3. Reload this page\n4. Tap "Allow" when prompted');
+            } else if (error.name === 'NotFoundError') {
+                alert('❌ No camera found on this device');
+            } else if (error.name === 'NotReadableError') {
+                alert('❌ Camera is already in use by another app.\n\nPlease close other apps using the camera and try again.');
+            } else if (error.message && error.message.includes('https')) {
+                alert('❌ Camera requires HTTPS connection.\n\nPlease access via https:// URL');
+            } else {
+                alert(`❌ Failed to start camera: ${error.message || error}\n\nTroubleshooting:\n• Check camera permissions in Settings\n• Make sure you're on https:// (not http://)\n• Close other apps using the camera\n• Try reloading the page`);
+            }
+        }
+    };
 
-            setShowScanner(true);
+    const fetchTicketBySessionToken = async (sessionToken: string) => {
+        try {
+            const res = await fetch(`/api/tickets?sessionToken=${sessionToken}`);
+            const data = await res.json();
+
+            if (res.ok && data.tickets && data.tickets.length > 0) {
+                setScannedTicket(data.tickets[0]);
+                setShowTicketModal(true);
+            } else {
+                alert('❌ Ticket not found for this QR code');
+            }
         } catch (error) {
-            console.error('Error starting scanner:', error);
-            alert('Failed to start camera. Please check permissions.');
+            console.error('Error fetching ticket:', error);
+            alert('Error loading ticket');
         }
     };
 
@@ -188,7 +243,7 @@ export default function TicketsAdminPage() {
         e.preventDefault();
 
         if (!qrInput.trim()) {
-            alert('Please enter a QR code');
+            alert('Please enter a session token');
             return;
         }
 
@@ -200,7 +255,7 @@ export default function TicketsAdminPage() {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    qrCode: qrInput.trim(),
+                    sessionToken: qrInput.trim(),
                     adminName
                 })
             });
@@ -521,6 +576,115 @@ export default function TicketsAdminPage() {
                     )}
                 </div>
             </div>
+
+            {/* Scanned Ticket Modal */}
+            {showTicketModal && scannedTicket && (
+                <div 
+                    className="modal d-block" 
+                    style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+                    onClick={() => setShowTicketModal(false)}
+                >
+                    <div 
+                        className="modal-dialog modal-dialog-centered"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="modal-content" style={{ backgroundColor: '#2b3035', color: 'white' }}>
+                            <div className="modal-header border-secondary">
+                                <h5 className="modal-title">
+                                    <i className="bi bi-qr-code-scan me-2"></i>
+                                    Scanned Ticket
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close btn-close-white" 
+                                    onClick={() => setShowTicketModal(false)}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                {/* Ticket Number Badge */}
+                                <div className="text-center mb-3">
+                                    <div className="badge bg-warning text-dark fs-4 px-4 py-2">
+                                        {scannedTicket.ticket_number || 'Pending...'}
+                                    </div>
+                                </div>
+
+                                {/* Ticket Details */}
+                                <div className="card" style={{ backgroundColor: '#3a3f47', border: '1px solid #495057' }}>
+                                    <div className="card-body">
+                                        <h6 className="text-warning mb-3">{scannedTicket.ticket_type_name}</h6>
+                                        
+                                        <p className="mb-2">
+                                            <strong>Name:</strong> {scannedTicket.sessions?.first_name || scannedTicket.first_name} {scannedTicket.sessions?.last_name || scannedTicket.last_name}
+                                        </p>
+                                        <p className="mb-2">
+                                            <strong>Email:</strong> {scannedTicket.sessions?.email || scannedTicket.email}
+                                        </p>
+                                        <p className="mb-2">
+                                            <strong>Price:</strong> €{scannedTicket.price.toFixed(2)}
+                                        </p>
+                                        <p className="mb-0">
+                                            <strong>Status:</strong> 
+                                            <span className={`badge ms-2 ${
+                                                scannedTicket.status === 'paid' ? 'bg-success' : 
+                                                scannedTicket.status === 'pending' ? 'bg-warning text-dark' : 'bg-secondary'
+                                            }`}>
+                                                {scannedTicket.status}
+                                            </span>
+                                        </p>
+
+                                        {scannedTicket.entry_redeemed && (
+                                            <div className="alert alert-info mt-3 mb-0">
+                                                <strong>Entry Already Used</strong><br />
+                                                <small>
+                                                    {scannedTicket.entry_redeemed_at && new Date(scannedTicket.entry_redeemed_at).toLocaleString()}<br />
+                                                    By: {scannedTicket.entry_redeemed_by}
+                                                </small>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer border-secondary">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowTicketModal(false)}
+                                >
+                                    Close
+                                </button>
+                                
+                                {scannedTicket.status === 'pending' && (
+                                    <button
+                                        className="btn btn-warning text-dark fw-bold"
+                                        onClick={() => {
+                                            setShowTicketModal(false);
+                                            handleMarkAsPaid(scannedTicket.id);
+                                        }}
+                                        disabled={updating === scannedTicket.id}
+                                    >
+                                        <i className="bi bi-credit-card me-2"></i>
+                                        Mark as Paid
+                                    </button>
+                                )}
+                                
+                                {scannedTicket.status === 'paid' && !scannedTicket.entry_redeemed && (
+                                    <button
+                                        className="btn btn-success"
+                                        onClick={() => {
+                                            setShowTicketModal(false);
+                                            handleRedeemById(scannedTicket.id);
+                                        }}
+                                        disabled={redeeming === scannedTicket.id}
+                                    >
+                                        <i className="bi bi-check-circle me-2"></i>
+                                        Redeem for Entry
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
