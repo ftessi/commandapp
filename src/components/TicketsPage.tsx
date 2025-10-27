@@ -8,6 +8,7 @@ import {
     storeSessionToken,
     clearSessionToken
 } from '../services/sessionService';
+import { supabase } from '../services/supabaseClient';
 
 interface TicketType {
     id: number;
@@ -58,7 +59,27 @@ export default function TicketsPage() {
             loadMyTicket(sessionToken);
         }
         setLoading(false);
-    }, []);    const loadMyTicket = async (sessionToken: string) => {
+    }, []);
+
+    // Realtime subscription for ticket types
+    useEffect(() => {
+        const ticketTypesChannel = supabase
+            .channel('ticket-types-changes')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'ticket_types' 
+            }, () => {
+                fetchTicketTypes();
+            })
+            .subscribe();
+        
+        return () => {
+            supabase.removeChannel(ticketTypesChannel);
+        };
+    }, []);
+
+    const loadMyTicket = async (sessionToken: string) => {
         try {
             // Add timestamp to prevent caching
             const timestamp = new Date().getTime();
