@@ -326,12 +326,10 @@ export default function TicketsPage() {
                             <div className="d-grid gap-3 mb-4">
                                 {/* Payment Status */}
                                 {myTicket.status === 'pending' ? (
-                                    <Link
-                                        href="/payment"
-                                        className="btn btn-warning btn-lg"
-                                    >
-                                        💳 Pay Now - €{myTicket.price.toFixed(2)}
-                                    </Link>
+                                    <button className="btn btn-info btn-lg" disabled>
+                                        <i className="bi bi-credit-card me-2"></i>
+                                        Payment at entrance with card or cash
+                                    </button>
                                 ) : (
                                     <button className="btn btn-success btn-lg" disabled>
                                         <i className="bi bi-check-circle-fill me-2"></i>

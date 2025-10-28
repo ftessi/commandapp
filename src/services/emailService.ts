@@ -26,7 +26,7 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
             return false;
         }
 
-        // Convert data URL to base64 attachment
+        // Convert data URL to base64 for attachment
         const qrCodeBase64 = data.qrCodeDataUrl.split(',')[1]; // Remove "data:image/png;base64," prefix
 
         const { data: emailResult, error } = await resend.emails.send({
@@ -37,7 +37,7 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
             attachments: [
                 {
                     filename: 'ticket-qr-code.png',
-                    content: qrCodeBase64,
+                    content: qrCodeBase64
                 }
             ]
         });
@@ -47,7 +47,7 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
             return false;
         }
 
-        console.log('✅ Email sent successfully:', emailResult);
+        console.log('✅ Email sent successfully with QR code attachment:', emailResult);
         return true;
     } catch (error) {
         console.error('❌ Error in sendTicketEmail:', error);
@@ -56,7 +56,7 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
 };
 
 /**
- * Generate HTML for ticket email
+ * Generate HTML for ticket email - Simple clean design
  */
 function getTicketEmailHTML(data: TicketEmailData): string {
     return `
@@ -169,14 +169,14 @@ function getTicketEmailHTML(data: TicketEmailData): string {
             </div>
             
             <div class="important-note">
-                <strong>⚠️ Important:</strong> Save this QR code! You'll need it to enter the event and access your orders at the bar.
+                <strong>⚠️ Important:</strong> Save this email! Your QR code is attached as <strong>ticket-qr-code.png</strong>. You'll need it to enter the event and access your orders at the bar.
             </div>
             
             <div class="qr-section">
                 <h3>Your Entry QR Code</h3>
                 <img src="${data.qrCodeDataUrl}" alt="QR Code" />
-                <p>Scan this at the entrance to gain entry<br/>and access your orders</p>
-                <p><small>Can't see the QR code? Check the attached image file.</small></p>
+                <p>Show this QR code at the entrance to gain entry<br/>and access your orders</p>
+                <p><small>Can't see the QR code? Find it attached as <strong>ticket-qr-code.png</strong></small></p>
             </div>
             
             <div style="text-align: center;">
@@ -186,7 +186,7 @@ function getTicketEmailHTML(data: TicketEmailData): string {
             </div>
             
             <p style="margin-top: 30px;">
-                <strong>Lost this email?</strong> No problem! Click the button above to view your QR code online, or find the attached QR code image in this email.
+                <strong>Lost this email?</strong> No problem! Click the button above to view your QR code online.
             </p>
             
             <p>
