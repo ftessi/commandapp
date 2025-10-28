@@ -26,11 +26,20 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
             return false;
         }
 
+        // Convert data URL to base64 attachment
+        const qrCodeBase64 = data.qrCodeDataUrl.split(',')[1]; // Remove "data:image/png;base64," prefix
+
         const { data: emailResult, error } = await resend.emails.send({
             from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
             to: [data.to],
-            subject: `Your Ticket for ${data.ticketType} - Event Name`,
-            html: getTicketEmailHTML(data)
+            subject: `Your Ticket for ${data.ticketType} - 7Vite`,
+            html: getTicketEmailHTML(data),
+            attachments: [
+                {
+                    filename: 'ticket-qr-code.png',
+                    content: qrCodeBase64,
+                }
+            ]
         });
 
         if (error) {
@@ -167,16 +176,17 @@ function getTicketEmailHTML(data: TicketEmailData): string {
                 <h3>Your Entry QR Code</h3>
                 <img src="${data.qrCodeDataUrl}" alt="QR Code" />
                 <p>Scan this at the entrance to gain entry<br/>and access your orders</p>
+                <p><small>Can't see the QR code? Check the attached image file.</small></p>
             </div>
             
             <div style="text-align: center;">
                 <a href="${data.appUrl}/qr/${data.sessionToken}" class="button">
-                    Open in App
+                    Open QR
                 </a>
             </div>
             
             <p style="margin-top: 30px;">
-                <strong>Lost this email?</strong> No problem! Just click the button above or scan the QR code at the event to restore your session and see all your orders.
+                <strong>Lost this email?</strong> No problem! Click the button above to view your QR code online, or find the attached QR code image in this email.
             </p>
             
             <p>

@@ -3,8 +3,8 @@ import { ProductProvider } from '@/context/ProductsDataContext'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Commandapp - Restaurant Ordering System',
-  description: 'Digital menu and ordering system',
+  title: '7Vite, allo stesso battito',
+  description: '7Vite - Digital menu and ticketing system',
 }
 
 export default function RootLayout({
