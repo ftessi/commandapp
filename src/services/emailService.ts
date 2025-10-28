@@ -32,7 +32,7 @@ export const sendTicketEmail = async (data: TicketEmailData): Promise<boolean> =
         const { data: emailResult, error } = await resend.emails.send({
             from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
             to: [data.to],
-            subject: `Your Ticket for ${data.ticketType} - 7Vite`,
+            subject: `Your Ticket for Entrance - 7Vite`,
             html: getTicketEmailHTML(data),
             attachments: [
                 {
@@ -164,7 +164,7 @@ function getTicketEmailHTML(data: TicketEmailData): string {
             
             <div class="ticket-details">
                 <p><strong>Name:</strong> ${data.firstName} ${data.lastName}</p>
-                <p><strong>Ticket Type:</strong> ${data.ticketType}</p>
+                <p><strong>Ticket Type:</strong> Entrance</p>
                 <p><strong>Price:</strong> €${data.price.toFixed(2)}</p>
             </div>
             
