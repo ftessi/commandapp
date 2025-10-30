@@ -49,7 +49,7 @@ export const generateTicketPDF = async (data: TicketPDFData): Promise<Buffer> =>
         const qrSize = 80; // mm
         const qrX = (pageWidth - qrSize) / 2;
         const qrY = 100;
-        
+
         doc.addImage(data.qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
         // Instructions below QR

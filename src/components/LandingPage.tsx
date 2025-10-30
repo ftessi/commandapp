@@ -11,6 +11,29 @@ export default function LandingPage() {
     const [checking, setChecking] = useState(true);
 
     useEffect(() => {
+        // Track visitor
+        const trackVisitor = async () => {
+            try {
+                // Get session token if available
+                const sessionToken = getStoredSessionToken();
+                
+                await fetch('/api/visitors', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sessionToken: sessionToken || null,
+                    }),
+                });
+                console.log('👁️ Visitor tracked with session:', sessionToken || 'anonymous');
+            } catch (error) {
+                console.error('Error tracking visitor:', error);
+            }
+        };
+
+        trackVisitor();
+
         // Check if user has active session and ticket is paid
         const checkSessionAndPayment = async () => {
             const session = hasActiveSession();

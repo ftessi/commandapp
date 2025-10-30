@@ -17,7 +17,7 @@ export default function ServiceControlPage() {
     // Supabase Realtime subscription for service status
     useEffect(() => {
         console.log('🔴 [ServiceControl] Setting up Realtime subscription for service status...');
-        
+
         const serviceChannel = supabase
             .channel('service-status-changes')
             .on(

@@ -38,7 +38,7 @@ export default function BarAdminPage() {
     // Supabase Realtime subscription for orders
     useEffect(() => {
         console.log('🔴 [BarAdmin] Setting up Realtime subscription for orders...');
-        
+
         const ordersChannel = supabase
             .channel('bar-orders-changes')
             .on(

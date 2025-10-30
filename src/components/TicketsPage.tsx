@@ -51,10 +51,10 @@ export default function TicketsPage() {
     useEffect(() => {
         const sessionToken = getStoredSessionToken();
         setHasSession(!!sessionToken);
-        
+
         // Always fetch ticket types (needed for "Request More Tickets" section)
         fetchTicketTypes();
-        
+
         if (sessionToken) {
             loadMyTicket(sessionToken);
         }
@@ -65,15 +65,15 @@ export default function TicketsPage() {
     useEffect(() => {
         const ticketTypesChannel = supabase
             .channel('ticket-types-changes')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'ticket_types' 
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'ticket_types'
             }, () => {
                 fetchTicketTypes();
             })
             .subscribe();
-        
+
         return () => {
             supabase.removeChannel(ticketTypesChannel);
         };
@@ -88,9 +88,9 @@ export default function TicketsPage() {
 
         const ticketsChannel = supabase
             .channel('user-tickets-changes')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
                 table: 'tickets'
             }, (payload) => {
                 console.log('🔔 [TicketsPage] Ticket update detected:', payload.eventType, payload.new);
@@ -108,7 +108,7 @@ export default function TicketsPage() {
                     console.error('⏱️ [TicketsPage] Tickets subscription timed out');
                 }
             });
-        
+
         return () => {
             console.log('🛑 [TicketsPage] Cleaning up tickets subscription');
             supabase.removeChannel(ticketsChannel);

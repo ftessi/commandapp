@@ -216,9 +216,9 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`✅ Found ${data?.length || 0} tickets`);
-        
+
         // Disable caching - always fetch fresh data
-        return NextResponse.json({ tickets: data || [] }, { 
+        return NextResponse.json({ tickets: data || [] }, {
             status: 200,
             headers: {
                 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',

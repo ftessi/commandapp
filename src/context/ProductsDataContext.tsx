@@ -56,7 +56,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
     // Supabase Realtime subscription for service status
     useEffect(() => {
         console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for service status...');
-        
+
         const serviceChannel = supabase
             .channel('products-service-status')
             .on(
@@ -92,7 +92,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
     // Supabase Realtime subscription for products and categories
     useEffect(() => {
         console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for products and categories...');
-        
+
         const productsChannel = supabase
             .channel('products-changes')
             .on(
@@ -345,10 +345,10 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
         if (!isListening) return;
 
         console.log('🔴 [ProductsDataContext] Setting up Realtime subscription for orders...');
-        
+
         // Get session token to filter only user's orders  
         const sessionToken = getStoredSessionToken();
-        
+
         // Subscribe to orders table changes
         const ordersChannel = supabase
             .channel('orders-changes')
@@ -361,17 +361,17 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
                 },
                 async (payload: any) => {
                     console.log('� [ProductsDataContext] Realtime order change:', payload.eventType, payload.new?.order_id);
-                    
+
                     // Re-fetch orders to get fresh data with full details
                     try {
                         let url = `/api/orders?_t=${Date.now()}`;
                         if (sessionToken) {
                             url += `&sessionToken=${sessionToken}`;
                         }
-                        
+
                         const response = await fetch(url, { cache: 'no-store' });
                         const data = await response.json();
-                        
+
                         if (data.orders && Array.isArray(data.orders)) {
                             const apiOrders: Order[] = data.orders.map((order: any) => ({
                                 orderId: order.order_id,
@@ -398,7 +398,7 @@ export const ProductProvider: React.FC<ProductProviderProps> = ({ children }) =>
 
                             setCurrentOrders(current);
                             setPastOrders(past);
-                            
+
                             console.log('✅ [ProductsDataContext] Orders updated from realtime event');
                         }
                     } catch (error) {

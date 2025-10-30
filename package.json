@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test-order-flow": "node scripts/test-order-flow.js",
+    "test-visitor-tracking": "node tests/visitor-tracking.test.js",
+    "test-visitor-quick": "node tests/quick-visitor-test.js",
+    "cleanup-test-visitors": "node scripts/cleanup-test-visitors.js",
     "copy-assets": "node scripts/copy-assets.js"
   },
   "dependencies": {

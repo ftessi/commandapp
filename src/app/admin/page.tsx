@@ -96,24 +96,6 @@ export default function AdminLoginPage() {
                                 </button>
                             </div>
                         </form>
-
-                        <div className="mt-4 p-3" style={{ backgroundColor: '#282c34', borderRadius: '8px' }}>
-                            <small className="text-white">
-                                <strong className="d-block mb-2">Default credentials:</strong>
-                                <div className="d-flex justify-content-between mb-1">
-                                    <span>💰 Payment Admin:</span>
-                                    <code style={{ color: '#ffc107' }}>admin / admin123</code>
-                                </div>
-                                <div className="d-flex justify-content-between mb-1">
-                                    <span>👨‍🍳 Bar Admin:</span>
-                                    <code style={{ color: '#28a745' }}>bar / bar123</code>
-                                </div>
-                                <div className="d-flex justify-content-between">
-                                    <span>🎫 Tickets Admin:</span>
-                                    <code style={{ color: '#17a2b8' }}>tickets / tickets123</code>
-                                </div>
-                            </small>
-                        </div>
                     </div>
                 </div>
             </div>

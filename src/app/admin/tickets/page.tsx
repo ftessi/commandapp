@@ -37,6 +37,12 @@ export default function TicketsAdminPage() {
     const [showScanner, setShowScanner] = useState(false);
     const [scannedTicket, setScannedTicket] = useState<Ticket | null>(null);
     const [showTicketModal, setShowTicketModal] = useState(false);
+    const [visitorStats, setVisitorStats] = useState({
+        uniqueIPs: 0,
+        uniqueSessions: 0,
+        todayVisits: 0,
+        weekVisits: 0,
+    });
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const router = useRouter();
 
@@ -49,6 +55,7 @@ export default function TicketsAdminPage() {
         }
 
         fetchTickets();
+        fetchVisitorStats();
     }, [router]);
 
     useEffect(() => {
@@ -67,7 +74,7 @@ export default function TicketsAdminPage() {
     // Supabase Realtime subscription for tickets
     useEffect(() => {
         console.log('🔴 [TicketsAdmin] Setting up Realtime subscription for tickets...');
-        
+
         const ticketsChannel = supabase
             .channel('tickets-changes')
             .on(
@@ -123,6 +130,19 @@ export default function TicketsAdminPage() {
         }
     };
 
+    const fetchVisitorStats = async () => {
+        try {
+            const res = await fetch('/api/visitors');
+            const data = await res.json();
+            if (data.success && data.data) {
+                setVisitorStats(data.data);
+                console.log('👁️ Visitor stats loaded:', data.data);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching visitor stats:', error);
+        }
+    };
+
     const filterTickets = () => {
         let filtered = tickets;
 
@@ -156,27 +176,27 @@ export default function TicketsAdminPage() {
     const startScanner = async () => {
         try {
             console.log('📷 Starting QR scanner...');
-            
+
             // Check if we're on HTTPS (required for camera on iOS Safari)
             if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
                 alert('⚠️ Camera requires HTTPS connection.\n\nPlease access this page via https:// instead of http://');
                 return;
             }
-            
+
             // Check if getUserMedia is available
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert('❌ Camera API not supported in this browser.\n\nPlease use Safari, Chrome, or another modern browser.');
                 return;
             }
-            
+
             console.log('📷 Browser supports camera API');
-            
+
             // Show scanner div first
             setShowScanner(true);
-            
+
             // Wait for DOM to update
             await new Promise(resolve => setTimeout(resolve, 200));
-            
+
             console.log('📷 Initializing Html5Qrcode...');
             const html5QrCode = new Html5Qrcode("qr-reader");
             scannerRef.current = html5QrCode;
@@ -193,7 +213,7 @@ export default function TicketsAdminPage() {
                     // Extract session token from URL
                     const match = decodedText.match(/\/qr\/([a-f0-9-]+)/i);
                     const sessionToken = match ? match[1] : decodedText;
-                    
+
                     // Fetch ticket by session token and show modal
                     fetchTicketBySessionToken(sessionToken);
                     stopScanner();
@@ -202,13 +222,13 @@ export default function TicketsAdminPage() {
                     // Ignore scan errors, they happen frequently
                 }
             );
-            
+
             console.log('✅ Camera started successfully');
         } catch (error: any) {
             console.error('❌ Error starting scanner:', error);
             console.error('❌ Error details:', error.message, error.name);
             setShowScanner(false);
-            
+
             // Better error message for iPhone/Safari
             if (error.name === 'NotAllowedError') {
                 alert('❌ Camera access denied.\n\nFor iPhone:\n1. Go to Settings > Safari > Camera\n2. Select "Ask" or "Allow"\n3. Reload this page\n4. Tap "Allow" when prompted');
@@ -391,10 +411,19 @@ export default function TicketsAdminPage() {
             <div className="container-fluid py-4">
                 {/* Header */}
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h2 className="text-white">🎫 Tickets Admin Dashboard</h2>
+                    <div>
+                        <h2 className="text-white mb-2">🎫 Tickets Admin Dashboard</h2>
+                        {/* Visitor Stats */}
+                        <div className="d-flex gap-3 text-muted small">
+                            <span>🌐 Unique IPs: <strong className="text-info">{visitorStats.uniqueIPs.toLocaleString()}</strong></span>
+                            <span>👤 Sessions: <strong className="text-primary">{visitorStats.uniqueSessions.toLocaleString()}</strong></span>
+                            <span>📅 Today: <strong className="text-success">{visitorStats.todayVisits}</strong></span>
+                            <span>📊 This Week: <strong className="text-warning">{visitorStats.weekVisits}</strong></span>
+                        </div>
+                    </div>
                     <div className="d-flex gap-2">
-                        <button 
-                            className="btn btn-outline-warning" 
+                        <button
+                            className="btn btn-outline-warning"
                             onClick={() => fetchTickets()}
                             disabled={loading}
                         >
@@ -640,12 +669,12 @@ export default function TicketsAdminPage() {
 
             {/* Scanned Ticket Modal */}
             {showTicketModal && scannedTicket && (
-                <div 
-                    className="modal d-block" 
+                <div
+                    className="modal d-block"
                     style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
                     onClick={() => setShowTicketModal(false)}
                 >
-                    <div 
+                    <div
                         className="modal-dialog modal-dialog-centered"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -655,9 +684,9 @@ export default function TicketsAdminPage() {
                                     <i className="bi bi-qr-code-scan me-2"></i>
                                     Scanned Ticket
                                 </h5>
-                                <button 
-                                    type="button" 
-                                    className="btn-close btn-close-white" 
+                                <button
+                                    type="button"
+                                    className="btn-close btn-close-white"
                                     onClick={() => setShowTicketModal(false)}
                                 ></button>
                             </div>
@@ -673,7 +702,7 @@ export default function TicketsAdminPage() {
                                 <div className="card" style={{ backgroundColor: '#3a3f47', border: '1px solid #495057' }}>
                                     <div className="card-body">
                                         <h6 className="text-warning mb-3">{scannedTicket.ticket_type_name}</h6>
-                                        
+
                                         <p className="mb-2">
                                             <strong>Name:</strong> {scannedTicket.sessions?.first_name || scannedTicket.first_name} {scannedTicket.sessions?.last_name || scannedTicket.last_name}
                                         </p>
@@ -684,11 +713,10 @@ export default function TicketsAdminPage() {
                                             <strong>Price:</strong> €{scannedTicket.price.toFixed(2)}
                                         </p>
                                         <p className="mb-0">
-                                            <strong>Status:</strong> 
-                                            <span className={`badge ms-2 ${
-                                                scannedTicket.status === 'paid' ? 'bg-success' : 
-                                                scannedTicket.status === 'pending' ? 'bg-warning text-dark' : 'bg-secondary'
-                                            }`}>
+                                            <strong>Status:</strong>
+                                            <span className={`badge ms-2 ${scannedTicket.status === 'paid' ? 'bg-success' :
+                                                    scannedTicket.status === 'pending' ? 'bg-warning text-dark' : 'bg-secondary'
+                                                }`}>
                                                 {scannedTicket.status}
                                             </span>
                                         </p>
@@ -706,14 +734,14 @@ export default function TicketsAdminPage() {
                                 </div>
                             </div>
                             <div className="modal-footer border-secondary">
-                                <button 
-                                    type="button" 
-                                    className="btn btn-secondary" 
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
                                     onClick={() => setShowTicketModal(false)}
                                 >
                                     Close
                                 </button>
-                                
+
                                 {scannedTicket.status === 'pending' && (
                                     <button
                                         className="btn btn-warning text-dark fw-bold"
@@ -727,7 +755,7 @@ export default function TicketsAdminPage() {
                                         Mark as Paid
                                     </button>
                                 )}
-                                
+
                                 {scannedTicket.status === 'paid' && !scannedTicket.entry_redeemed && (
                                     <button
                                         className="btn btn-success"
