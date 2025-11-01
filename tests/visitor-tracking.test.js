@@ -96,7 +96,7 @@ class VisitorTrackingTests {
 
     async testGetVisitorStatsEndpoint() {
         const data = await this.getVisitorStats();
-        
+
         await this.assertTrue(data.success, 'Response should be successful');
         await this.assertTrue('data' in data, 'Response should have data field');
         await this.assertTrue('uniqueIPs' in data.data, 'Should have uniqueIPs');
@@ -108,7 +108,7 @@ class VisitorTrackingTests {
     async testTrackVisitorWithIP() {
         const testIP = `192.168.1.${Math.floor(Math.random() * 255)}`;
         const result = await this.trackVisitor({ ip: testIP });
-        
+
         await this.assertTrue(result.success, 'Tracking should succeed');
         await this.assertTrue(
             result.type === 'insert' || result.type === 'update',
@@ -119,32 +119,32 @@ class VisitorTrackingTests {
     async testTrackVisitorWithSession() {
         const testSession = `test-session-${Date.now()}`;
         const result = await this.trackVisitor({ sessionToken: testSession });
-        
+
         await this.assertTrue(result.success, 'Tracking with session should succeed');
     }
 
     async testTrackVisitorWithBothIPAndSession() {
         const testIP = `10.0.0.${Math.floor(Math.random() * 255)}`;
         const testSession = `test-session-${Date.now()}`;
-        
+
         const result = await this.trackVisitor({
             ip: testIP,
             sessionToken: testSession,
         });
-        
+
         await this.assertTrue(result.success, 'Tracking with both should succeed');
     }
 
     async testUniqueIPConstraint() {
         const testIP = `172.16.0.${Math.floor(Math.random() * 255)}`;
-        
+
         // First visit - should insert
         const result1 = await this.trackVisitor({ ip: testIP });
         await this.assertEqual(result1.type, 'insert', 'First visit should insert');
-        
+
         // Wait a bit to ensure different timestamp
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Second visit - should update
         const result2 = await this.trackVisitor({ ip: testIP });
         await this.assertEqual(result2.type, 'update', 'Second visit should update');
@@ -153,20 +153,20 @@ class VisitorTrackingTests {
     async testDifferentIPsCreateMultipleRecords() {
         const statsBefore = await this.getVisitorStats();
         const ipsBefore = statsBefore.data.uniqueIPs;
-        
+
         // Track two different IPs
         const ip1 = `203.0.113.${Math.floor(Math.random() * 255)}`;
         const ip2 = `203.0.114.${Math.floor(Math.random() * 255)}`;
-        
+
         await this.trackVisitor({ ip: ip1 });
         await this.trackVisitor({ ip: ip2 });
-        
+
         // Wait a bit for stats to update
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const statsAfter = await this.getVisitorStats();
         const ipsAfter = statsAfter.data.uniqueIPs;
-        
+
         await this.assertGreaterThan(
             ipsAfter,
             ipsBefore - 1, // Allow for slight timing differences
@@ -176,15 +176,15 @@ class VisitorTrackingTests {
 
     async testSessionFallbackWhenNoIP() {
         const testSession = `fallback-session-${Date.now()}`;
-        
+
         // Track without IP (only session)
         const result = await this.trackVisitor({ sessionToken: testSession });
-        
+
         await this.assertTrue(result.success, 'Session fallback should work');
         await this.assertTrue(
-            result.message.toLowerCase().includes('session') || 
-            result.message.toLowerCase().includes('visitor') || 
-            result.type === 'insert' || 
+            result.message.toLowerCase().includes('session') ||
+            result.message.toLowerCase().includes('visitor') ||
+            result.type === 'insert' ||
             result.type === 'update',
             'Should track by session or as visitor'
         );
@@ -193,55 +193,55 @@ class VisitorTrackingTests {
     async testMultipleIPsInXForwardedFor() {
         // Simulate proxy chain with multiple IPs
         const multipleIPs = '203.0.113.1, 198.51.100.1, 192.0.2.1';
-        
+
         const result = await this.trackVisitor({ ip: multipleIPs });
-        
+
         await this.assertTrue(result.success, 'Should handle multiple IPs');
     }
 
     async testEmptyIPString() {
         const result = await this.trackVisitor({ ip: '' });
-        
+
         await this.assertTrue(result.success, 'Should handle empty IP string');
     }
 
     async testUnknownIPString() {
         const result = await this.trackVisitor({ ip: 'Unknown' });
-        
+
         await this.assertTrue(result.success, 'Should handle Unknown IP string');
     }
 
     async testVisitorStatsIncreaseAfterTracking() {
         const statsBefore = await this.getVisitorStats();
-        
+
         // Track a unique visitor
         const uniqueIP = `192.0.2.${Math.floor(Math.random() * 255)}`;
         await this.trackVisitor({ ip: uniqueIP });
-        
+
         // Wait for database to update
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const statsAfter = await this.getVisitorStats();
-        
+
         // At least one stat should have increased
-        const increased = 
+        const increased =
             statsAfter.data.uniqueIPs >= statsBefore.data.uniqueIPs ||
             statsAfter.data.uniqueSessions >= statsBefore.data.uniqueSessions;
-        
+
         await this.assertTrue(increased, 'Stats should increase after tracking');
     }
 
     async testConcurrentVisitorTracking() {
         const promises = [];
-        
+
         // Simulate 5 concurrent visitors with different IPs
         for (let i = 0; i < 5; i++) {
             const ip = `198.51.100.${Math.floor(Math.random() * 255)}`;
             promises.push(this.trackVisitor({ ip }));
         }
-        
+
         const results = await Promise.all(promises);
-        
+
         // All should succeed
         results.forEach((result, index) => {
             this.assertTrue(
@@ -255,12 +255,12 @@ class VisitorTrackingTests {
         const testIP = `10.10.10.${Math.floor(Math.random() * 255)}`;
         const session1 = `session-1-${Date.now()}`;
         const session2 = `session-2-${Date.now()}`;
-        
+
         // Track same IP with different sessions
         await this.trackVisitor({ ip: testIP, sessionToken: session1 });
         await new Promise(resolve => setTimeout(resolve, 100));
         await this.trackVisitor({ ip: testIP, sessionToken: session2 });
-        
+
         // Should update, not create new record
         const result = await this.trackVisitor({ ip: testIP, sessionToken: session2 });
         await this.assertEqual(result.type, 'update', 'Should update existing IP record');
@@ -269,7 +269,7 @@ class VisitorTrackingTests {
     async testNoIPNoSession() {
         // Track visitor with neither IP nor session
         const result = await this.trackVisitor({});
-        
+
         await this.assertTrue(result.success, 'Should handle anonymous visitor');
     }
 
@@ -277,7 +277,7 @@ class VisitorTrackingTests {
         const start = Date.now();
         await this.trackVisitor({ ip: '8.8.8.8' });
         const duration = Date.now() - start;
-        
+
         await this.assertTrue(
             duration < 5000,
             `API should respond within 5 seconds (took ${duration}ms)`
@@ -288,7 +288,7 @@ class VisitorTrackingTests {
         const start = Date.now();
         await this.getVisitorStats();
         const duration = Date.now() - start;
-        
+
         await this.assertTrue(
             duration < 3000,
             `Stats API should respond within 3 seconds (took ${duration}ms)`
@@ -349,7 +349,7 @@ class VisitorTrackingTests {
         this.log('╚══════════════════════════════════════════╝', 'yellow');
         this.log(`\nTotal Tests: ${total}`, 'blue');
         this.log(`✅ Passed: ${this.passed}`, 'green');
-        
+
         if (this.failed > 0) {
             this.log(`❌ Failed: ${this.failed}`, 'red');
             this.log(`\nFailed Tests:`, 'red');
@@ -362,9 +362,9 @@ class VisitorTrackingTests {
                     }
                 });
         }
-        
+
         this.log(`\nPass Rate: ${passRate}%`, this.failed === 0 ? 'green' : 'yellow');
-        
+
         if (this.failed === 0) {
             this.log('\n🎉 ALL TESTS PASSED! 🎉', 'green');
         } else {

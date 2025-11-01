@@ -16,7 +16,7 @@ export default function LandingPage() {
             try {
                 // Get session token if available
                 const sessionToken = getStoredSessionToken();
-                
+
                 await fetch('/api/visitors', {
                     method: 'POST',
                     headers: {

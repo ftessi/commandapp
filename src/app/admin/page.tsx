@@ -29,6 +29,14 @@ export default function AdminLoginPage() {
             localStorage.setItem('adminAuth', 'true');
             localStorage.setItem('adminRole', 'tickets');
             router.push('/admin/tickets');
+        } else if (username === 'cashier' && password === 'cashier123') {
+            localStorage.setItem('adminAuth', 'true');
+            localStorage.setItem('adminRole', 'cashier');
+            router.push('/admin/cashier');
+        } else if (username === 'cashier2' && password === 'cashier123') {
+            localStorage.setItem('adminAuth', 'true');
+            localStorage.setItem('adminRole', 'cashier2');
+            router.push('/admin/cashier2');
         } else {
             setError('Invalid credentials');
             setLoading(false);

@@ -22,10 +22,10 @@ async function quickTest() {
                 sessionToken: 'quick-test-session',
             }),
         });
-        
+
         const trackData = await trackResponse.json();
         console.log('   Response:', trackData);
-        
+
         if (trackData.success) {
             console.log('   ✅ Visitor tracking works!\n');
         } else {
@@ -38,7 +38,7 @@ async function quickTest() {
         const statsResponse = await fetch(`${BASE_URL}/api/visitors`);
         const statsData = await statsResponse.json();
         console.log('   Response:', statsData);
-        
+
         if (statsData.success && statsData.data) {
             console.log('   ✅ Stats retrieval works!');
             console.log(`   📊 Unique IPs: ${statsData.data.uniqueIPs}`);
@@ -62,10 +62,10 @@ async function quickTest() {
                 sessionToken: 'quick-test-session',
             }),
         });
-        
+
         const trackData2 = await trackResponse2.json();
         console.log('   Response:', trackData2);
-        
+
         if (trackData2.type === 'update') {
             console.log('   ✅ Unique IP constraint works! (Updated existing record)\n');
         } else if (trackData2.type === 'insert') {

@@ -43,12 +43,12 @@ export async function POST(request: NextRequest) {
         const sessionToken = body.sessionToken || null;
 
         const userAgent = request.headers.get('user-agent') || 'Unknown';
-        
+
         // Try to get IP from various headers
-        let ipAddress = request.headers.get('x-forwarded-for') || 
-                       request.headers.get('x-real-ip') || 
-                       request.headers.get('cf-connecting-ip') ||
-                       null;
+        let ipAddress = request.headers.get('x-forwarded-for') ||
+            request.headers.get('x-real-ip') ||
+            request.headers.get('cf-connecting-ip') ||
+            null;
 
         // If x-forwarded-for has multiple IPs, take the first one
         if (ipAddress && ipAddress.includes(',')) {

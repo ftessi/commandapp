@@ -715,7 +715,7 @@ export default function TicketsAdminPage() {
                                         <p className="mb-0">
                                             <strong>Status:</strong>
                                             <span className={`badge ms-2 ${scannedTicket.status === 'paid' ? 'bg-success' :
-                                                    scannedTicket.status === 'pending' ? 'bg-warning text-dark' : 'bg-secondary'
+                                                scannedTicket.status === 'pending' ? 'bg-warning text-dark' : 'bg-secondary'
                                                 }`}>
                                                 {scannedTicket.status}
                                             </span>
